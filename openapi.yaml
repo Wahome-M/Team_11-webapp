@@ -1,0 +1,378 @@
+openapi: 3.0.0
+info:
+  title: FundiLink API
+  version: 1.0.0
+  description: >
+    API for FundiLink, a platform connecting employers who need short-term
+    casual work done with verified local workers ("fundis"). This contract
+    covers the endpoints identified in Week 3's needs analysis: worker
+    search, job posting, booking/application tracking, and worker profile
+    lookup.
+
+paths:
+  /users:
+    get:
+      summary: Return a filtered list of users, primarily used to search for verified workers by trade and location.
+      parameters:
+        - name: role
+          in: query
+          required: false
+          description: Filter by account type.
+          schema:
+            type: string
+            enum: [worker, employer]
+            example: worker
+        - name: trade
+          in: query
+          required: false
+          description: Filter workers by their skill/trade category.
+          schema:
+            type: string
+            example: plumbing
+        - name: location
+          in: query
+          required: false
+          description: Filter by location (partial match, case-insensitive).
+          schema:
+            type: string
+            example: Westlands, Nairobi
+        - name: verified
+          in: query
+          required: false
+          description: Filter to only verified accounts.
+          schema:
+            type: boolean
+            example: true
+      responses:
+        '200':
+          description: A list of users matching the given filters. Returns an empty array if none match.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+              example:
+                - id: 1
+                  firstName: John
+                  lastName: Kamau
+                  email: john@example.com
+                  role: worker
+                  trade: plumbing
+                  location: Westlands, Nairobi
+                  verified: true
+        '500':
+          description: Server or database error while fetching users.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Failed to fetch users
+
+  /users/{id}:
+    get:
+      summary: Retrieve a single user's profile and verification details by ID.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The numeric ID of the user.
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: The requested user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: 1
+                firstName: John
+                lastName: Kamau
+                email: john@example.com
+                role: worker
+                trade: plumbing
+                location: Westlands, Nairobi
+                verified: true
+        '404':
+          description: No user exists with the given ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: User not found
+        '500':
+          description: Server or database error while fetching the user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Failed to fetch user
+
+  /jobs:
+    post:
+      summary: Create a new job posting with category, location, and pay rate.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, category, location, pay, employerId]
+              properties:
+                title:
+                  type: string
+                  example: Fix leaking kitchen sink
+                category:
+                  type: string
+                  example: plumbing
+                location:
+                  type: string
+                  example: Westlands, Nairobi
+                pay:
+                  type: number
+                  format: double
+                  example: 1500
+                payType:
+                  type: string
+                  example: fixed
+                  default: fixed
+                urgent:
+                  type: boolean
+                  example: true
+                  default: false
+                duration:
+                  type: string
+                  example: ~2 hours
+                employerId:
+                  type: integer
+                  example: 2
+                employer:
+                  type: string
+                  description: Denormalized display name of the employer, shown on job cards without a join.
+                  example: Peter Mwangi
+                description:
+                  type: string
+                  example: The kitchen sink has been dripping for 3 days. Need someone to replace the tap washer.
+      responses:
+        '201':
+          description: The job was created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+              example:
+                id: 1
+                title: Fix leaking kitchen sink
+                category: plumbing
+                location: Westlands, Nairobi
+                pay: 1500
+                payType: fixed
+                urgent: true
+                duration: ~2 hours
+                employerId: 2
+                employer: Peter Mwangi
+                description: The kitchen sink has been dripping for 3 days. Need someone to replace the tap washer.
+                isActive: true
+        '500':
+          description: Server or database error while creating the job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Failed to create job
+
+  /jobs/{id}/bookings:
+    get:
+      summary: List all bookings (applications) submitted for a specific job posting, with each one's status.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The numeric ID of the job posting.
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: All bookings for this job. Returns an empty array if no one has applied yet.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+              example:
+                - id: 1
+                  jobId: 1
+                  workerId: 1
+                  workerName: John Kamau
+                  status: pending
+                  appliedAt: "2026-09-09T07:15:00Z"
+        '500':
+          description: Server or database error while fetching bookings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Failed to fetch bookings for job
+
+  /bookings/{id}:
+    get:
+      summary: Read the current status of a single booking, e.g. to confirm a requested worker has been secured.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The numeric ID of the booking.
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: The requested booking.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+              example:
+                id: 1
+                jobId: 1
+                workerId: 1
+                workerName: John Kamau
+                status: confirmed
+                appliedAt: "2026-09-09T07:15:00Z"
+        '404':
+          description: No booking exists with the given ID.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Booking not found
+        '500':
+          description: Server or database error while fetching the booking.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Failed to fetch booking
+
+components:
+  schemas:
+    User:
+      type: object
+      required: [id, firstName, lastName, email, role]
+      properties:
+        id:
+          type: integer
+          example: 1
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Kamau
+        email:
+          type: string
+          format: email
+          example: john@example.com
+        role:
+          type: string
+          enum: [worker, employer]
+          example: worker
+        trade:
+          type: string
+          nullable: true
+          description: Only present for worker accounts.
+          example: plumbing
+        location:
+          type: string
+          nullable: true
+          example: Westlands, Nairobi
+        verified:
+          type: boolean
+          example: true
+
+    Job:
+      type: object
+      required: [id, title, category, location, pay]
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Fix leaking kitchen sink
+        category:
+          type: string
+          example: plumbing
+        location:
+          type: string
+          example: Westlands, Nairobi
+        pay:
+          type: number
+          format: double
+          example: 1500
+        payType:
+          type: string
+          example: fixed
+        urgent:
+          type: boolean
+          example: true
+        duration:
+          type: string
+          example: ~2 hours
+        employerId:
+          type: integer
+          example: 2
+        employer:
+          type: string
+          example: Peter Mwangi
+        description:
+          type: string
+          example: The kitchen sink has been dripping for 3 days.
+        isActive:
+          type: boolean
+          example: true
+
+    Booking:
+      type: object
+      required: [id, jobId, workerId, status]
+      properties:
+        id:
+          type: integer
+          example: 1
+        jobId:
+          type: integer
+          example: 1
+        workerId:
+          type: integer
+          example: 1
+        workerName:
+          type: string
+          example: John Kamau
+        status:
+          type: string
+          enum: [pending, confirmed, rejected, completed]
+          example: pending
+        appliedAt:
+          type: string
+          format: date-time
+          example: "2026-09-09T07:15:00Z"
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: Something went wrong
