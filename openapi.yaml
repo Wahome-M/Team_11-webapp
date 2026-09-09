@@ -1,6 +1,5 @@
 openapi: 3.0.0
 info:
-<<<<<<< HEAD
   title: FundiLink API
   version: 1.0.0
   description: >
@@ -377,9 +376,3 @@ components:
         error:
           type: string
           example: Something went wrong
-=======
-title: FundiLink API
-version: 1.0.0
-paths: GET | /users?role=worker&trade={trade}&location={location}&verified=true
-# every endpoint from ENDPOINT_LIST.md goes here
->>>>>>> 8202202749e38d35f036316aee52b3c7a1ce8c96
