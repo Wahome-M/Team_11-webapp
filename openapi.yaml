@@ -1,0 +1,6 @@
+openapi: 3.0.0
+info:
+title: FundiLink API
+version: 1.0.0
+paths: GET | /users?role=worker&trade={trade}&location={location}&verified=true
+# every endpoint from ENDPOINT_LIST.md goes here
