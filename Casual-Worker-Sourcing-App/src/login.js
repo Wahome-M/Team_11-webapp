@@ -33,12 +33,18 @@ loginForm.addEventListener("submit", async (e) => {
   if (!email || !password) { alert("Please fill in all fields."); return; }
 
   try {
-    const res = await fetch(`http://localhost:3001/users?email=${encodeURIComponent(email)}`);
-    const users = await res.json();
-    const user = users.find(u => u.password === password);
+    const res = await fetch("http://localhost:5000/users/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
 
-    if (!user) { alert("Invalid email or password."); return; }
+    if (!res.ok) {
+      alert("Invalid email or password.");
+      return;
+    }
 
+    const user = await res.json();
     localStorage.setItem("fundilinkUser", JSON.stringify(user));
 
     // Redirect based on role
@@ -49,7 +55,7 @@ loginForm.addEventListener("submit", async (e) => {
     }
 
   } catch (error) {
-    alert("Could not reach server. Is json-server running on port 3001?");
+    alert("Could not reach server. Is the server running on port 5000?");
   }
 });
 
@@ -71,11 +77,20 @@ registerForm.addEventListener("submit", async (e) => {
   }
 
   try {
-    const res = await fetch("http://localhost:3001/users", {
+    const res = await fetch("http://localhost:5000/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ firstName, lastName, email, password, role })
     });
+
+    if (res.status === 409) {
+      alert("That email is already registered. Try logging in instead.");
+      return;
+    }
+    if (!res.ok) {
+      alert("Registration failed. Please try again.");
+      return;
+    }
 
     const newUser = await res.json();
     localStorage.setItem("fundilinkUser", JSON.stringify(newUser));
@@ -87,6 +102,6 @@ registerForm.addEventListener("submit", async (e) => {
     }
 
   } catch (error) {
-    alert("Could not reach server. Is json-server running on port 3001?");
+    alert("Could not reach server. Is the server running on port 5000?");
   }
 });

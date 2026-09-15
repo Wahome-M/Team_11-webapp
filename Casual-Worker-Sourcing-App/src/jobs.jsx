@@ -32,14 +32,14 @@ function JobGrid() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:3001/jobs")
+    fetch("http://localhost:5000/jobs")
       .then(res => res.json())
       .then(data => {
         setJobs(data.map(j => ({ ...j, applied: false })));
         setLoading(false);
       })
       .catch(() => {
-        alert("Could not load jobs. Is json-server running on port 3001?");
+        alert("Could not load jobs. Is the server running on port 5000?");
         setLoading(false);
       });
   }, []);
@@ -59,15 +59,13 @@ function JobGrid() {
     const user = JSON.parse(localStorage.getItem("fundilinkUser"));
     if (!user) { alert("Please log in to apply."); return; }
 
-    await fetch("http://localhost:3001/applications", {
+    await fetch("http://localhost:5000/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         jobId,
         workerId: user.id,
-        workerName: `${user.firstName} ${user.lastName}`,
-        status: "pending",
-        appliedAt: new Date().toISOString()
+        workerName: `${user.firstName} ${user.lastName}`
       })
     });
 
