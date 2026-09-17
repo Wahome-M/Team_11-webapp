@@ -92,7 +92,7 @@ Casual-Worker-Sourcing-App/
 
 ## Team
 
-Built by **Group 8** ·  Strathmore University,Nairobi, Kenya · 2026
+Built by **Team 11** ·  Strathmore University,Nairobi, Kenya · 2026
 
 
 
