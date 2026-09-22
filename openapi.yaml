@@ -183,6 +183,14 @@ paths:
                 employer: Peter Mwangi
                 description: The kitchen sink has been dripping for 3 days. Need someone to replace the tap washer.
                 isActive: true
+        '400':
+          description: Request failed validation (missing required field, wrong type, empty value, non-positive pay, unknown employerId, or malformed JSON). Nothing is written.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: title is required
         '500':
           description: Server or database error while creating the job.
           content:
