@@ -16,6 +16,29 @@ function mapUserToContract(dbUser) {
   };
 }
 
+// Validation Helper Function for creating or updating a user
+function validateUserData(body, isUpdate = false) {
+  const errors = [];
+  
+  if (!body.firstName || typeof body.firstName !== 'string') {
+    errors.push('firstName is required and must be a string');
+  }
+  if (!body.lastName || typeof body.lastName !== 'string') {
+    errors.push('lastName is required and must be a string');
+  }
+  if (!body.email || typeof body.email !== 'string') {
+    errors.push('email is required and must be a string');
+  }
+  if (!body.role || typeof body.role !== 'string') {
+    errors.push('role is required and must be a string');
+  }
+  if (!isUpdate && (!body.password || typeof body.password !== 'string')) {
+    errors.push('password is required and must be a string');
+  }
+
+  return errors;
+}
+
 // GET /users?role=worker&trade=plumbing&location=Westlands&verified=true
 router.get('/', async (req, res) => {
   try {
@@ -29,13 +52,13 @@ router.get('/', async (req, res) => {
     if (verified) { query += ' AND verified = ?'; params.push(verified === 'true' ? 1 : 0); }
 
     const [rows] = await db.query(query, params);
-
     const formattedUsers = rows.map(mapUserToContract);
 
-    res.json(rows);
+    // FIX #1: Send formattedUsers instead of raw rows
+    return res.json(formattedUsers);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to fetch users' });
+    return res.status(500).json({ error: 'Failed to fetch users' });
   }
 });
 
@@ -47,36 +70,97 @@ router.get('/:id', async (req, res) => {
       [req.params.id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
-    res.json(rows[0]);
 
+    // FIX #2: Removed duplicated res.json call
     const formattedUser = mapUserToContract(rows[0]);
-    
-    res.status(200).json(formattedUser);
+    return res.status(200).json(formattedUser);
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Failed to fetch user' });
+    return res.status(500).json({ error: 'Failed to fetch user' });
   }
 });
 
 // POST /users (registration)
 router.post('/', async (req, res) => {
   try {
-    const { firstName, lastName, email, password, role } = req.body;
-    if (!firstName || !lastName || !email || !password || !role) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    const errors = validateUserData(req.body);
+    if (errors.length > 0) {
+      return res.status(400).json({ error: 'Validation failed', details: errors });
     }
+
+    const { firstName, lastName, email, password, role, trade, location, verified } = req.body;
+
     const [result] = await db.query(
-      'INSERT INTO users (firstName, lastName, email, password, role) VALUES (?, ?, ?, ?, ?)',
-      [firstName, lastName, email, password, role]
+      'INSERT INTO users (firstName, lastName, email, password, role, trade, location, verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [firstName, lastName, email, password, role, trade || null, location || null, verified ? 1 : 0]
     );
-    res.status(201).json({ id: result.insertId, firstName, lastName, email, role });
+
+    const [rows] = await db.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
+    const createdUser = mapUserToContract(rows[0]);
+
+    return res.status(201).json(createdUser);
   } catch (err) {
     console.error(err);
     if (err.code === 'ER_DUP_ENTRY') {
       return res.status(409).json({ error: 'Email already registered' });
     }
-    res.status(500).json({ error: 'Failed to create user' });
+    return res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
+// PUT /users/:id (update existing user)
+router.put('/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const errors = validateUserData(req.body, true);
+    if (errors.length > 0) {
+      return res.status(400).json({ error: 'Validation failed', details: errors });
+    }
+
+    const [existing] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { firstName, lastName, email, password, role, trade, location, verified } = req.body;
+
+    await db.query(
+      `UPDATE users 
+       SET firstName = ?, lastName = ?, email = ?, password = COALESCE(?, password), role = ?, trade = ?, location = ?, verified = ? 
+       WHERE id = ?`,
+      [firstName, lastName, email, password || null, role, trade || null, location || null, verified ? 1 : 0, userId]
+    );
+
+    const [updatedRows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    const updatedUser = mapUserToContract(updatedRows[0]);
+
+    return res.status(200).json(updatedUser);
+  } catch (err) {
+    console.error(err);
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Email already registered' });
+    }
+    return res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+// DELETE /users/:id (delete user)
+router.delete('/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+
+    const [existing] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    if (existing.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await db.query('DELETE FROM users WHERE id = ?', [userId]);
+
+    return res.status(204).send();
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to delete user' });
   }
 });
 
@@ -84,12 +168,19 @@ router.post('/', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
     const [rows] = await db.query('SELECT * FROM users WHERE email = ? AND password = ?', [email, password]);
     if (rows.length === 0) return res.status(401).json({ error: 'Invalid email or password' });
-    res.json(rows[0]);
+    
+    // FIX #3: Map user payload to omit sensitive internal details like password
+    const userPayload = mapUserToContract(rows[0]);
+    return res.json(userPayload);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Login failed' });
+    return res.status(500).json({ error: 'Login failed' });
   }
 });
 
