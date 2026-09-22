@@ -2,6 +2,20 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
+// Explicit mapping step to guarantee contract adherence
+function mapUserToContract(dbUser) {
+  return {
+    id: Number(dbUser.id),
+    firstName: dbUser.firstName,
+    lastName: dbUser.lastName,
+    email: dbUser.email,
+    role: dbUser.role,
+    trade: dbUser.trade || null,
+    location: dbUser.location,
+    verified: Boolean(dbUser.verified) // Guarantees true boolean instead of 1/0
+  };
+}
+
 // GET /users?role=worker&trade=plumbing&location=Westlands&verified=true
 router.get('/', async (req, res) => {
   try {
@@ -15,6 +29,9 @@ router.get('/', async (req, res) => {
     if (verified) { query += ' AND verified = ?'; params.push(verified === 'true' ? 1 : 0); }
 
     const [rows] = await db.query(query, params);
+
+    const formattedUsers = rows.map(mapUserToContract);
+
     res.json(rows);
   } catch (err) {
     console.error(err);
@@ -31,6 +48,11 @@ router.get('/:id', async (req, res) => {
     );
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
     res.json(rows[0]);
+
+    const formattedUser = mapUserToContract(rows[0]);
+    
+    res.status(200).json(formattedUser);
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch user' });

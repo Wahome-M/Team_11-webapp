@@ -12,9 +12,9 @@ app.get('/', (req, res) => {
   res.send('FundiLink API is running');
 });
 
-const userRoutes = require('./routes/users');
-const jobRoutes = require('./routes/jobs');
-const bookingRoutes = require('./routes/bookings');
+const userRoutes = require('./server/routes/users');
+const jobRoutes = require('./server/routes/jobs');
+const bookingRoutes = require('./server/routes/bookings');
 
 app.use('/users', userRoutes);
 app.use('/jobs', jobRoutes);

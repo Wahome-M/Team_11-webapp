@@ -9,6 +9,10 @@ info:
     search, job posting, booking/application tracking, and worker profile
     lookup.
 
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+
 paths:
   /users:
     get:
