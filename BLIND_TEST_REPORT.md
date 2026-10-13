@@ -46,7 +46,7 @@ Our README passed the blind test. A team outside our ring, with no prior context
 
 ## Appendix: us testing their README (StudySync API)
 
-- **Did we get a successful call?** Yes. `GET /api/members` returned `200` with three members.
+- **Did we get a successful call?** Yes, twice. First, running their API locally from the README: `GET /api/members` returned `200` with three members. Second, against their live tunnel URL (details below).
 - **Time:** about 7 minutes, from opening their README at about 22:56 EAT to the first `200` at 23:03 EAT.
 - **What we did:** cloned the repo, ran `npm install`, followed `SETUP.md` steps 2–3 for the database, created `server/.env` from their example, and ran `npm start` on a Mac.
 
@@ -58,9 +58,18 @@ Our README passed the blind test. A team outside our ring, with no prior context
 | Set `PORT=5001` in `.env` and restarted | `GET /api/members` returned `200` | The workaround isn't documented |
 | Compared the response with the README quickstart | Anna came back with `"initials":"A"` and `"reliability":95`, but the README shows `"AN"` and `85` | **No.** The example doesn't match the setup data |
 
+**Second test, against their live API.** They later sent a tunnel base URL (`https://creating-buck-genes-middle.trycloudflare.com/api`) with the same README.
+
+- **Result:** `GET {base}/members` returned `200` with 10 members at 23:28 EAT. It worked on the first request with no stuck points.
+- **Their live data matches their README quickstart** (Anna: `"AN"`, `85`). So the mismatch we hit locally comes from the `SETUP.md` seed data, not the API.
+- **The base-URL swap is a trap.** Their base URL ends in `/api`, but every README example already includes `/api` in the path. Swapping `http://localhost:5000` for the full base URL, as the examples invite, gives `{base}/api/members` = `/api/api/members`, which returned `404`. Appending just `/members` worked. The routes with no `/api` prefix sit at the host root: `https://creating-buck-genes-middle.trycloudflare.com/users/anna/reliability-score` returned `200` with exactly the README's example response. So to call those, a tester has to remove `/api` from the base URL they were given.
+- **Unknown routes return HTML, not JSON.** That `404` was Express's default HTML page (`Cannot GET /api/api/members`), but their README's error section says every error returns a JSON body with an `error` string. A client that parses error bodies as JSON would break on it.
+- **Their live data showed the ID limit in action.** Leftover test members with IDs cut at 10 characters (`debug-memb`, `partner-de`) match the limitation their README already lists.
+
 **Gaps we'd flag to them:**
 
 1. **Add a Mac port-5000 (AirPlay) warning.** This was the only real blocker. A reasonable person following the README exactly would get a silent empty reply and be stuck.
 2. **Put the database steps in the README itself**, rather than splitting them across `SETUP.md` and a `schema_additions.sql` the README mentions but never says to run.
 3. **Make the quickstart example match the seed data** (initials and reliability).
-4. **Resolve the contradictions between README and `SETUP.md`:** `npm start` vs `npm run dev`, and `/api/deadlines` with no dates (`SETUP.md`) vs `from`/`to` being required (README).
+4. **Give the host-only base URL** (or note that paths already include `/api`), and return JSON for unknown routes so the error section holds true.
+5. **Resolve the contradictions between README and `SETUP.md`:** `npm start` vs `npm run dev`, and `/api/deadlines` with no dates (`SETUP.md`) vs `from`/`to` being required (README).
