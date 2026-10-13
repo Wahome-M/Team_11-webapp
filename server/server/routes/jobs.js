@@ -29,11 +29,11 @@ router.post('/', async (req, res) => {
   try {
     const { title, category, location, pay, payType, urgent, duration, employerId, employer, description } = req.body;
     if (!title || !category || !location || typeof pay !== 'number' || pay < 0) {
-     return res.status(400).json({
-     error: 'Validation failed',
-     details: ['title, category, location and pay (a non-negative number) are required'],
-  });
-}
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: ['title, category, location and pay (a non-negative number) are required'],
+      });
+    }
     const [result] = await db.query(
       `INSERT INTO jobs (title, category, location, pay, payType, urgent, duration, employerId, employer, description, isActive)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
