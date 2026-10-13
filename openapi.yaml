@@ -1,55 +1,75 @@
 openapi: 3.0.0
 info:
   title: FundiLink API
-  version: 1.0.0
+  version: 1.1.0
   description: >
     API for FundiLink, a platform connecting employers who need short-term
-    casual work done with verified local workers ("fundis"). This contract
-    covers the endpoints identified in Week 3's needs analysis: worker
-    search, job posting, booking/application tracking, and worker profile
-    lookup.
+    casual work done with verified local workers ("fundis"). Employers post
+    jobs, workers apply to them (a "booking"), and employers track and update
+    each booking's status.
+
+
+    **Authentication:** none yet. Every endpoint is open; no token or header
+    is needed. Real authentication arrives in Week 9. `POST /users/login`
+    only checks an email and password and returns the user; it does not
+    issue a token.
+
+
+    **Errors:** every failed request returns JSON with an `error` message.
+    Validation failures (400) also include a `details` array listing each
+    problem. Check the HTTP status code first: 2xx is success, anything else
+    is a failure.
+
+security: []   # no authentication yet (Week 9)
 
 servers:
   - url: http://localhost:5000
-    description: Local development server
+    description: Local development server (see README.md to run it)
+
+tags:
+  - name: Users
+    description: Worker and employer accounts
+  - name: Jobs
+    description: Job postings created by employers
+  - name: Bookings
+    description: A worker's application to a job, and its status
 
 paths:
   /users:
     get:
-      summary: Return a filtered list of users, primarily used to search for verified workers by trade and location.
+      operationId: searchUsers
+      tags: [Users]
+      summary: Search users (e.g. find verified plumbers in Westlands)
+      description: All filters are optional and can be combined. With no filters, every user is returned.
       parameters:
         - name: role
           in: query
-          required: false
           description: Filter by account type.
           schema:
             type: string
             enum: [worker, employer]
-            example: worker
+          example: worker
         - name: trade
           in: query
-          required: false
-          description: Filter workers by their skill/trade category.
+          description: Filter workers by trade (exact match).
           schema:
             type: string
-            example: plumbing
+          example: plumbing
         - name: location
           in: query
-          required: false
           description: Filter by location (partial match, case-insensitive).
           schema:
             type: string
-            example: Westlands, Nairobi
+          example: Westlands
         - name: verified
           in: query
-          required: false
-          description: Filter to only verified accounts.
+          description: Only verified (`true`) or only unverified (`false`) accounts.
           schema:
             type: boolean
-            example: true
+          example: true
       responses:
         '200':
-          description: A list of users matching the given filters. Returns an empty array if none match.
+          description: Matching users. An empty array if none match.
           content:
             application/json:
               schema:
@@ -66,25 +86,64 @@ paths:
                   location: Westlands, Nairobi
                   verified: true
         '500':
-          description: Server or database error while fetching users.
+          $ref: '#/components/responses/ServerError'
+    post:
+      operationId: createUser
+      tags: [Users]
+      summary: Register a new worker or employer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewUser'
+            example:
+              firstName: Amina
+              lastName: Hassan
+              email: amina@example.com
+              password: secret1
+              role: worker
+              trade: painting
+              location: South B, Nairobi
+      responses:
+        '201':
+          description: The user was created. The password is never returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: 5
+                firstName: Amina
+                lastName: Hassan
+                email: amina@example.com
+                role: worker
+                trade: painting
+                location: South B, Nairobi
+                verified: false
+        '400':
+          description: A required field is missing or has the wrong type.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
-                error: Failed to fetch users
+                error: Validation failed
+                details:
+                  - lastName is required and must be a string
+                  - password is required and must be a string
+        '409':
+          $ref: '#/components/responses/EmailTaken'
+        '500':
+          $ref: '#/components/responses/ServerError'
 
   /users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
     get:
-      summary: Retrieve a single user's profile and verification details by ID.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: The numeric ID of the user.
-          schema:
-            type: integer
-            example: 1
+      operationId: getUser
+      tags: [Users]
+      summary: Get one user's profile
       responses:
         '200':
           description: The requested user.
@@ -102,118 +161,224 @@ paths:
                 location: Westlands, Nairobi
                 verified: true
         '404':
-          description: No user exists with the given ID.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                error: User not found
+          $ref: '#/components/responses/UserNotFound'
         '500':
-          description: Server or database error while fetching the user.
+          $ref: '#/components/responses/ServerError'
+    put:
+      operationId: updateUser
+      tags: [Users]
+      summary: Replace a user's profile
+      description: >
+        Send the full profile. `firstName`, `lastName`, `email` and `role` are
+        required. Omitted optional fields (`trade`, `location`) are cleared and
+        `verified` becomes false if omitted. `password` is optional here; if
+        omitted, the existing password is kept.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+            example:
+              firstName: John
+              lastName: Kamau
+              email: john@example.com
+              role: worker
+              trade: plumbing
+              location: Parklands, Nairobi
+              verified: true
+      responses:
+        '200':
+          description: The updated user.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                error: Failed to fetch user
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+        '409':
+          $ref: '#/components/responses/EmailTaken'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    delete:
+      operationId: deleteUser
+      tags: [Users]
+      summary: Delete a user
+      description: Also deletes that user's bookings. Jobs they posted stay, with `employerId` set to null.
+      responses:
+        '204':
+          description: Deleted. The response has no body.
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
 
-  /jobs:
+  /users/login:
     post:
-      summary: Create a new job posting with category, location, and pay rate.
+      operationId: login
+      tags: [Users]
+      summary: Check an email and password
+      description: Returns the matching user. No token is issued yet (Week 9).
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [title, category, location, pay, employerId]
+              required: [email, password]
               properties:
-                title:
+                email:
                   type: string
-                  example: Fix leaking kitchen sink
-                category:
+                  format: email
+                password:
                   type: string
-                  example: plumbing
-                location:
-                  type: string
-                  example: Westlands, Nairobi
-                pay:
-                  type: number
-                  format: double
-                  example: 1500
-                payType:
-                  type: string
-                  example: fixed
-                  default: fixed
-                urgent:
-                  type: boolean
-                  example: true
-                  default: false
-                duration:
-                  type: string
-                  example: ~2 hours
-                employerId:
-                  type: integer
-                  example: 2
-                employer:
-                  type: string
-                  description: Denormalized display name of the employer, shown on job cards without a join.
-                  example: Peter Mwangi
-                description:
-                  type: string
-                  example: The kitchen sink has been dripping for 3 days. Need someone to replace the tap washer.
+            example:
+              email: john@example.com
+              password: password123
+      responses:
+        '200':
+          description: Correct credentials. Returns the user (without password).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Email or password missing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Email and password are required
+        '401':
+          description: No user with that email and password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Invalid email or password
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /jobs:
+    get:
+      operationId: listJobs
+      tags: [Jobs]
+      summary: Browse active job postings
+      parameters:
+        - name: category
+          in: query
+          description: Only jobs in this category (exact match).
+          schema:
+            type: string
+          example: plumbing
+      responses:
+        '200':
+          description: Active jobs. An empty array if none match.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Job'
+              example:
+                - id: 1
+                  title: Fix leaking kitchen sink
+                  category: plumbing
+                  location: Westlands, Nairobi
+                  pay: 1500
+                  payType: fixed
+                  urgent: true
+                  duration: ~2 hours
+                  employerId: 2
+                  employer: Peter Mwangi
+                  description: The kitchen sink has been dripping for 3 days. Need someone to replace the tap washer.
+                  isActive: true
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      operationId: createJob
+      tags: [Jobs]
+      summary: Post a new job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewJob'
+            example:
+              title: Paint front gate
+              category: painting
+              location: Kilimani, Nairobi
+              pay: 2000
+              employerId: 2
       responses:
         '201':
-          description: The job was created successfully.
+          description: The job was created. Returns the stored record, including defaults.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Job'
               example:
-                id: 1
-                title: Fix leaking kitchen sink
-                category: plumbing
-                location: Westlands, Nairobi
-                pay: 1500
+                id: 3
+                title: Paint front gate
+                category: painting
+                location: Kilimani, Nairobi
+                pay: 2000
                 payType: fixed
-                urgent: true
-                duration: ~2 hours
+                urgent: false
+                duration: null
                 employerId: 2
-                employer: Peter Mwangi
-                description: The kitchen sink has been dripping for 3 days. Need someone to replace the tap washer.
+                employer: null
+                description: null
                 isActive: true
         '400':
-          description: Request failed validation (missing required field, wrong type, empty value, non-positive pay, unknown employerId, or malformed JSON). Nothing is written.
+          description: >
+            Missing or invalid field, `employerId` that doesn't exist, or a
+            body that isn't valid JSON. Nothing is saved.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-              example:
-                error: title is required
+              examples:
+                missingField:
+                  summary: Missing or invalid required field
+                  value:
+                    error: Validation failed
+                    details:
+                      - title, category, location and pay (a non-negative number) are required
+                unknownEmployer:
+                  summary: employerId doesn't exist
+                  value:
+                    error: Validation failed
+                    details:
+                      - employerId does not match an existing user
+                badJson:
+                  summary: Body is not valid JSON
+                  value:
+                    error: Request body is not valid JSON
         '500':
-          description: Server or database error while creating the job.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                error: Failed to create job
+          $ref: '#/components/responses/ServerError'
 
   /jobs/{id}/bookings:
     get:
-      summary: List all bookings (applications) submitted for a specific job posting, with each one's status.
+      operationId: listJobBookings
+      tags: [Jobs]
+      summary: List everyone who applied to a job
       parameters:
         - name: id
           in: path
           required: true
-          description: The numeric ID of the job posting.
+          description: The job's numeric ID.
           schema:
             type: integer
-            example: 1
+          example: 1
       responses:
         '200':
-          description: All bookings for this job. Returns an empty array if no one has applied yet.
+          description: All bookings for this job. An empty array if nobody has applied.
           content:
             application/json:
               schema:
@@ -226,27 +391,76 @@ paths:
                   workerId: 1
                   workerName: John Kamau
                   status: pending
-                  appliedAt: "2026-09-09T07:15:00Z"
+                  appliedAt: "2026-09-09T04:15:00.000Z"
+        '404':
+          $ref: '#/components/responses/JobNotFound'
         '500':
-          description: Server or database error while fetching bookings.
+          $ref: '#/components/responses/ServerError'
+
+  /bookings:
+    post:
+      operationId: createBooking
+      tags: [Bookings]
+      summary: Apply to a job (creates a pending booking)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewBooking'
+            example:
+              jobId: 1
+              workerId: 4
+              workerName: Brian Otieno
+      responses:
+        '201':
+          description: The booking was created with status `pending`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+              example:
+                id: 3
+                jobId: 1
+                workerId: 4
+                workerName: Brian Otieno
+                status: pending
+                appliedAt: "2026-10-13T18:43:17.000Z"
+        '400':
+          description: '`jobId` or `workerId` missing or not a positive integer.'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
-                error: Failed to fetch bookings for job
+                error: Validation failed
+                details:
+                  - jobId is required and must be a positive integer
+                  - workerId is required and must be a positive integer
+        '404':
+          description: The job or the worker doesn't exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Job not found
+        '500':
+          $ref: '#/components/responses/ServerError'
 
   /bookings/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: The booking's numeric ID.
+        schema:
+          type: integer
+        example: 1
     get:
-      summary: Read the current status of a single booking, e.g. to confirm a requested worker has been secured.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          description: The numeric ID of the booking.
-          schema:
-            type: integer
-            example: 1
+      operationId: getBooking
+      tags: [Bookings]
+      summary: Check one booking's status
       responses:
         '200':
           description: The requested booking.
@@ -259,30 +473,125 @@ paths:
                 jobId: 1
                 workerId: 1
                 workerName: John Kamau
-                status: confirmed
-                appliedAt: "2026-09-09T07:15:00Z"
+                status: pending
+                appliedAt: "2026-09-09T04:15:00.000Z"
         '404':
-          description: No booking exists with the given ID.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                error: Booking not found
+          $ref: '#/components/responses/BookingNotFound'
         '500':
-          description: Server or database error while fetching the booking.
+          $ref: '#/components/responses/ServerError'
+    put:
+      operationId: updateBookingStatus
+      tags: [Bookings]
+      summary: Change a booking's status (e.g. confirm a worker)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [pending, confirmed, rejected, completed]
+            example:
+              status: confirmed
+      responses:
+        '200':
+          description: The updated booking.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+              example:
+                id: 1
+                jobId: 1
+                workerId: 1
+                workerName: John Kamau
+                status: confirmed
+                appliedAt: "2026-09-09T04:15:00.000Z"
+        '400':
+          description: '`status` is missing or not one of the allowed values.'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
-                error: Failed to fetch booking
+                error: Validation failed
+                details:
+                  - 'status must be one of: pending, confirmed, rejected, completed'
+        '404':
+          $ref: '#/components/responses/BookingNotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
 
 components:
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      description: The user's numeric ID.
+      schema:
+        type: integer
+      example: 1
+
+  responses:
+    ValidationError:
+      description: A required field is missing or has the wrong type. Nothing is saved.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Validation failed
+            details:
+              - email is required and must be a string
+    UserNotFound:
+      description: No user has that ID.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: User not found
+    JobNotFound:
+      description: No job has that ID.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Job not found
+    BookingNotFound:
+      description: No booking has that ID.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Booking not found
+    EmailTaken:
+      description: Another user already has this email.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Email already registered
+    ServerError:
+      description: Unexpected server or database error (for example, MySQL isn't running).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Failed to fetch users
+
   schemas:
     User:
       type: object
-      required: [id, firstName, lastName, email, role]
+      required: [id, firstName, lastName, email, role, verified]
       properties:
         id:
           type: integer
@@ -300,11 +609,10 @@ components:
         role:
           type: string
           enum: [worker, employer]
-          example: worker
         trade:
           type: string
           nullable: true
-          description: Only present for worker accounts.
+          description: Worker's trade. Null for employers.
           example: plumbing
         location:
           type: string
@@ -314,9 +622,58 @@ components:
           type: boolean
           example: true
 
+    NewUser:
+      type: object
+      required: [firstName, lastName, email, password, role]
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+          description: Must be unique.
+        password:
+          type: string
+        role:
+          type: string
+          enum: [worker, employer]
+        trade:
+          type: string
+        location:
+          type: string
+        verified:
+          type: boolean
+          default: false
+
+    UserUpdate:
+      type: object
+      required: [firstName, lastName, email, role]
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          description: Optional. Omit to keep the current password.
+        role:
+          type: string
+          enum: [worker, employer]
+        trade:
+          type: string
+        location:
+          type: string
+        verified:
+          type: boolean
+
     Job:
       type: object
-      required: [id, title, category, location, pay]
+      required: [id, title, category, location, pay, payType, urgent, isActive]
       properties:
         id:
           type: integer
@@ -332,33 +689,65 @@ components:
           example: Westlands, Nairobi
         pay:
           type: number
-          format: double
+          description: Amount in KES.
           example: 1500
         payType:
           type: string
           example: fixed
         urgent:
           type: boolean
-          example: true
         duration:
           type: string
+          nullable: true
           example: ~2 hours
         employerId:
           type: integer
+          nullable: true
           example: 2
         employer:
           type: string
+          nullable: true
+          description: Employer's display name, shown on job cards.
           example: Peter Mwangi
         description:
           type: string
-          example: The kitchen sink has been dripping for 3 days.
+          nullable: true
         isActive:
           type: boolean
-          example: true
+
+    NewJob:
+      type: object
+      required: [title, category, location, pay]
+      properties:
+        title:
+          type: string
+        category:
+          type: string
+        location:
+          type: string
+        pay:
+          type: number
+          minimum: 0
+          description: Amount in KES. Must be a JSON number, not a string.
+        payType:
+          type: string
+          default: fixed
+        urgent:
+          type: boolean
+          default: false
+        duration:
+          type: string
+        employerId:
+          type: integer
+          description: Optional, but if given it must be an existing user's ID.
+        employer:
+          type: string
+        description:
+          type: string
 
     Booking:
       type: object
-      required: [id, jobId, workerId, status]
+      required: [id, jobId, workerId, status, appliedAt]
       properties:
         id:
           type: integer
@@ -371,15 +760,27 @@ components:
           example: 1
         workerName:
           type: string
+          nullable: true
           example: John Kamau
         status:
           type: string
           enum: [pending, confirmed, rejected, completed]
-          example: pending
         appliedAt:
           type: string
           format: date-time
-          example: "2026-09-09T07:15:00Z"
+
+    NewBooking:
+      type: object
+      required: [jobId, workerId]
+      properties:
+        jobId:
+          type: integer
+          description: Must be an existing job.
+        workerId:
+          type: integer
+          description: Must be an existing user.
+        workerName:
+          type: string
 
     Error:
       type: object
@@ -387,4 +788,9 @@ components:
       properties:
         error:
           type: string
-          example: Something went wrong
+          example: Validation failed
+        details:
+          type: array
+          description: Only on 400 validation errors. One entry per problem.
+          items:
+            type: string

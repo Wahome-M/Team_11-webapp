@@ -39,8 +39,14 @@ router.post('/', async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
       [title, category, location, pay, payType || 'fixed', urgent || false, duration, employerId, employer, description]
     );
-    res.status(201).json({ id: result.insertId, ...req.body });
+    // Return the stored record (includes defaults like payType, urgent, isActive)
+    const [rows] = await db.query('SELECT * FROM jobs WHERE id = ?', [result.insertId]);
+    const job = rows[0];
+    res.status(201).json({ ...job, pay: Number(job.pay), urgent: Boolean(job.urgent), isActive: Boolean(job.isActive) });
   } catch (err) {
+    if (err.code === 'ER_NO_REFERENCED_ROW_2') {
+      return res.status(400).json({ error: 'Validation failed', details: ['employerId does not match an existing user'] });
+    }
     console.error(err);
     res.status(500).json({ error: 'Failed to create job' });
   }
