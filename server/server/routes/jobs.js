@@ -28,6 +28,12 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const { title, category, location, pay, payType, urgent, duration, employerId, employer, description } = req.body;
+    if (!title || !category || !location || typeof pay !== 'number' || pay < 0) {
+     return res.status(400).json({
+     error: 'Validation failed',
+     details: ['title, category, location and pay (a non-negative number) are required'],
+  });
+}
     const [result] = await db.query(
       `INSERT INTO jobs (title, category, location, pay, payType, urgent, duration, employerId, employer, description, isActive)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
@@ -43,6 +49,9 @@ router.post('/', async (req, res) => {
 // GET /jobs/:id/bookings (all applications for one job)
 router.get('/:id/bookings', async (req, res) => {
   try {
+    const [jobs] = await db.query('SELECT id FROM jobs WHERE id = ?', [req.params.id]);
+    if (jobs.length === 0) return res.status(404).json({ error: 'Job not found' });
+
     const [rows] = await db.query('SELECT * FROM bookings WHERE jobId = ?', [req.params.id]);
     res.json(rows);
   } catch (err) {

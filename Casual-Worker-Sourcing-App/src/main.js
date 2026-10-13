@@ -1,8 +1,7 @@
-// ── Auth guard + dynamic nav ──────────────────────────────────────────────────
 const user = JSON.parse(localStorage.getItem("fundilinkUser"));
 const currentPage = window.location.pathname.split("/").pop();
 
-// Pages that require login
+// login
 const protectedPages = ["jobs.html", "dashboard.html", "post-job.html", "my-applications.html"];
 
 if (protectedPages.includes(currentPage) && !user) {
@@ -41,7 +40,7 @@ if (navMenu && user) {
   });
 }
 
-// ── Hamburger menu ────────────────────────────────────────────────────────────
+//Hamburger menu 
 const hamburger = document.getElementById("hamburger");
 if (hamburger && navMenu) {
   hamburger.addEventListener("click", () => {
@@ -59,7 +58,7 @@ if (hamburger && navMenu) {
   });
 }
 
-// ── Smooth scroll ─────────────────────────────────────────────────────────────
+//Smooth scroll
 document.querySelectorAll('.nav-menu a[href^="#"]').forEach(link => {
   link.addEventListener("click", e => {
     const target = document.querySelector(link.getAttribute("href"));
@@ -67,7 +66,7 @@ document.querySelectorAll('.nav-menu a[href^="#"]').forEach(link => {
   });
 });
 
-// ── Sticky header shadow ──────────────────────────────────────────────────────
+//Sticky header shadow
 const header = document.querySelector("header");
 if (header) {
   window.addEventListener("scroll", () => {
