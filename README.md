@@ -71,6 +71,8 @@ All requests and responses below were captured from a freshly set-up database. R
 
 Every request with a body needs the header `Content-Type: application/json`.
 
+**Given a hosted URL instead of running it yourself** (e.g. `https://something.trycloudflare.com`)? Replace `http://localhost:5000` with that URL in every command. The paths stay the same, and there is no `/api` prefix: `https://something.trycloudflare.com/jobs`.
+
 **Sample data you start with**
 
 | Users | Jobs | Bookings |
