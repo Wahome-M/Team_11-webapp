@@ -48,12 +48,12 @@ CREATE TABLE bookings (
   FOREIGN KEY (workerId) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Sample data (passwords are plain text for now; real auth arrives in Week 9)
+-- Sample data. Passwords are stored hashed (scrypt); every sample user's password is: password123
 INSERT INTO users (firstName, lastName, email, password, role, trade, location, verified) VALUES
-  ('John',  'Kamau',   'john@example.com',  'password123', 'worker',   'plumbing',   'Westlands, Nairobi',  TRUE),
-  ('Peter', 'Mwangi',  'peter@example.com', 'password123', 'employer', NULL,         'Kilimani, Nairobi',   TRUE),
-  ('Grace', 'Wanjiru', 'grace@example.com', 'password123', 'worker',   'cleaning',   'Kileleshwa, Nairobi', TRUE),
-  ('Brian', 'Otieno',  'brian@example.com', 'password123', 'worker',   'electrical', 'Westlands, Nairobi',  FALSE);
+  ('John',  'Kamau',   'john@example.com',  'scrypt$96de3f860858cf8f92ec6267b26e2d5c$85daf14c2f5737b12b6d5080f303fbd7f1599fb3ea2f5b4f470f525232328f3ea8dd2a5fea4560d7fc5f3bfdc7040c516a9cf2d17991ecab72e186f662c2d01e', 'worker',   'plumbing',   'Westlands, Nairobi',  TRUE),
+  ('Peter', 'Mwangi',  'peter@example.com', 'scrypt$2a6589a0da5034070efd88c0ab90c283$d7e718ae55066a76a4c62f26c2fdc915fd4b47fd872a62adcbd0d8237cbd090096069981cf88fb935f534e94c4fbc5669604bbae1fb1b6ec8401e74442519acc', 'employer', NULL,         'Kilimani, Nairobi',   TRUE),
+  ('Grace', 'Wanjiru', 'grace@example.com', 'scrypt$2e2d7bddb76063f5974d9fff717cbe19$389fe3a799168b341a25ccbb76b9c3f2fcc1dfc53896ac6322c16b41e36d79056dec2413ae437f19f69a4312b5d500f0d98df20910d353ca4c7fc0e7542a6aee', 'worker',   'cleaning',   'Kileleshwa, Nairobi', TRUE),
+  ('Brian', 'Otieno',  'brian@example.com', 'scrypt$46d435e0d4f7a765f31bcb06898ffd3e$b435bfd8315037496fee5a3744bfe42cb46674b9fb7546b90ff488f3ad52edfdd691a7eba2f212f009291a6be094d6ab291a290d4e9ad6c90cefa0101a77785d', 'worker',   'electrical', 'Westlands, Nairobi',  FALSE);
 
 INSERT INTO jobs (title, category, location, pay, payType, urgent, duration, employerId, employer, description) VALUES
   ('Fix leaking kitchen sink', 'plumbing', 'Westlands, Nairobi', 1500, 'fixed', TRUE,  '~2 hours', 2, 'Peter Mwangi',

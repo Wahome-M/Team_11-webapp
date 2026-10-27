@@ -1,8 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { hashPassword, verifyPassword } = require('../passwords');
 
-// Explicit mapping step to guarantee contract adherence
+const ROLES = ['worker', 'employer'];
+
+// Full profile: only for a single user (GET /users/:id, create, update, login).
+// Built from an explicit field list, so the password hash can never leak.
 function mapUserToContract(dbUser) {
   return {
     id: Number(dbUser.id),
@@ -12,14 +16,20 @@ function mapUserToContract(dbUser) {
     role: dbUser.role,
     trade: dbUser.trade || null,
     location: dbUser.location,
-    verified: Boolean(dbUser.verified) // Guarantees true boolean instead of 1/0
+    verified: Boolean(dbUser.verified), // true boolean instead of 1/0
   };
 }
 
-// Validation Helper Function for creating or updating a user
+// Search results: same as above but WITHOUT email, so nobody can download every user's email in one call.
+function mapUserSummary(dbUser) {
+  const { email, ...summary } = mapUserToContract(dbUser);
+  return summary;
+}
+
+// Validation for creating or updating a user
 function validateUserData(body, isUpdate = false) {
   const errors = [];
-  
+
   if (!body.firstName || typeof body.firstName !== 'string') {
     errors.push('firstName is required and must be a string');
   }
@@ -29,11 +39,14 @@ function validateUserData(body, isUpdate = false) {
   if (!body.email || typeof body.email !== 'string') {
     errors.push('email is required and must be a string');
   }
-  if (!body.role || typeof body.role !== 'string') {
-    errors.push('role is required and must be a string');
+  if (!ROLES.includes(body.role)) {
+    errors.push('role is required and must be worker or employer');
   }
   if (!isUpdate && (!body.password || typeof body.password !== 'string')) {
     errors.push('password is required and must be a string');
+  }
+  if (isUpdate && body.password !== undefined && (typeof body.password !== 'string' || !body.password)) {
+    errors.push('password must be a non-empty string if provided');
   }
 
   return errors;
@@ -52,10 +65,7 @@ router.get('/', async (req, res) => {
     if (verified) { query += ' AND verified = ?'; params.push(verified === 'true' ? 1 : 0); }
 
     const [rows] = await db.query(query, params);
-    const formattedUsers = rows.map(mapUserToContract);
-
-    // FIX #1: Send formattedUsers instead of raw rows
-    return res.json(formattedUsers);
+    return res.json(rows.map(mapUserSummary));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to fetch users' });
@@ -70,11 +80,7 @@ router.get('/:id', async (req, res) => {
       [req.params.id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
-
-    // FIX #2: Removed duplicated res.json call
-    const formattedUser = mapUserToContract(rows[0]);
-    return res.status(200).json(formattedUser);
-
+    return res.status(200).json(mapUserToContract(rows[0]));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to fetch user' });
@@ -89,17 +95,17 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Validation failed', details: errors });
     }
 
-    const { firstName, lastName, email, password, role, trade, location, verified } = req.body;
+    // Only these fields are read from the body. Anything else (id, verified, isAdmin...) is ignored.
+    // New accounts always start unverified.
+    const { firstName, lastName, email, password, role, trade, location } = req.body;
 
     const [result] = await db.query(
-      'INSERT INTO users (firstName, lastName, email, password, role, trade, location, verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [firstName, lastName, email, password, role, trade || null, location || null, verified ? 1 : 0]
+      'INSERT INTO users (firstName, lastName, email, password, role, trade, location, verified) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
+      [firstName, lastName, email, hashPassword(password), role, trade || null, location || null]
     );
 
     const [rows] = await db.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
-    const createdUser = mapUserToContract(rows[0]);
-
-    return res.status(201).json(createdUser);
+    return res.status(201).json(mapUserToContract(rows[0]));
   } catch (err) {
     console.error(err);
     if (err.code === 'ER_DUP_ENTRY') {
@@ -118,24 +124,23 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Validation failed', details: errors });
     }
 
-    const [existing] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    const [existing] = await db.query('SELECT id FROM users WHERE id = ?', [userId]);
     if (existing.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const { firstName, lastName, email, password, role, trade, location, verified } = req.body;
+    // `verified` is not accepted from callers: a user can't mark themselves as verified.
+    const { firstName, lastName, email, password, role, trade, location } = req.body;
 
     await db.query(
-      `UPDATE users 
-       SET firstName = ?, lastName = ?, email = ?, password = COALESCE(?, password), role = ?, trade = ?, location = ?, verified = ? 
+      `UPDATE users
+       SET firstName = ?, lastName = ?, email = ?, password = COALESCE(?, password), role = ?, trade = ?, location = ?
        WHERE id = ?`,
-      [firstName, lastName, email, password || null, role, trade || null, location || null, verified ? 1 : 0, userId]
+      [firstName, lastName, email, password ? hashPassword(password) : null, role, trade || null, location || null, userId]
     );
 
     const [updatedRows] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
-    const updatedUser = mapUserToContract(updatedRows[0]);
-
-    return res.status(200).json(updatedUser);
+    return res.status(200).json(mapUserToContract(updatedRows[0]));
   } catch (err) {
     console.error(err);
     if (err.code === 'ER_DUP_ENTRY') {
@@ -150,13 +155,12 @@ router.delete('/:id', async (req, res) => {
   try {
     const userId = req.params.id;
 
-    const [existing] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    const [existing] = await db.query('SELECT id FROM users WHERE id = ?', [userId]);
     if (existing.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
     await db.query('DELETE FROM users WHERE id = ?', [userId]);
-
     return res.status(204).send();
   } catch (err) {
     console.error(err);
@@ -164,20 +168,21 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// POST /users/login
+// POST /users/login (checks credentials; no token yet)
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email || !password) {
+    if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const [rows] = await db.query('SELECT * FROM users WHERE email = ? AND password = ?', [email, password]);
-    if (rows.length === 0) return res.status(401).json({ error: 'Invalid email or password' });
-    
-    // FIX #3: Map user payload to omit sensitive internal details like password
-    const userPayload = mapUserToContract(rows[0]);
-    return res.json(userPayload);
+    const [rows] = await db.query('SELECT * FROM users WHERE email = ?', [email]);
+    // Same message whether the email or the password is wrong, so callers can't probe which emails exist
+    if (rows.length === 0 || !verifyPassword(password, rows[0].password)) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    return res.json(mapUserToContract(rows[0]));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Login failed' });

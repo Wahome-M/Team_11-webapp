@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: FundiLink API
-  version: 1.1.0
+  version: 1.2.0
   description: >
     API for FundiLink, a platform connecting employers who need short-term
     casual work done with verified local workers ("fundis"). Employers post
@@ -9,10 +9,15 @@ info:
     each booking's status.
 
 
-    **Authentication:** none yet. Every endpoint is open; no token or header
-    is needed. Real authentication arrives in Week 9. `POST /users/login`
-    only checks an email and password and returns the user; it does not
-    issue a token.
+    **Authentication:** every endpoint needs an API key in the `X-API-Key`
+    header. A missing or wrong key gets `401`. Each consumer gets its own key
+    from our team, sent privately. `GET /` (health check) is the only open
+    path. `POST /users/login` only checks a user's email and password; it is
+    not how you authenticate to the API and does not issue a token.
+
+
+    **Rate limit:** 100 requests per minute per key. Going over returns `429`
+    with a `Retry-After` header (seconds to wait) and a JSON body.
 
 
     **Errors:** every failed request returns JSON with an `error` message.
@@ -20,13 +25,16 @@ info:
     problem. Check the HTTP status code first: 2xx is success, anything else
     is a failure.
 
-security: []   # no authentication yet (Week 9)
+security:
+  - ApiKeyAuth: []   # every operation needs a key unless it overrides this
 
 servers:
   - url: http://localhost:5000
     description: Local development server (see README.md to run it)
 
 tags:
+  - name: Health
+    description: Is the server up?
   - name: Users
     description: Worker and employer accounts
   - name: Jobs
@@ -35,12 +43,32 @@ tags:
     description: A worker's application to a job, and its status
 
 paths:
+  /:
+    get:
+      operationId: healthCheck
+      tags: [Health]
+      summary: Health check (no key needed)
+      description: Returns a fixed text message and no data, so anyone can check the server is up.
+      security: []
+      responses:
+        '200':
+          description: The server is running.
+          content:
+            text/html:
+              schema:
+                type: string
+              example: FundiLink API is running
+
   /users:
     get:
       operationId: searchUsers
       tags: [Users]
       summary: Search users (e.g. find verified plumbers in Westlands)
-      description: All filters are optional and can be combined. With no filters, every user is returned.
+      description: >
+        All filters are optional and can be combined. With no filters, every
+        user is returned. Results leave out `email` so a caller can't collect
+        every user's email in one request; use `GET /users/{id}` for a full
+        profile.
       parameters:
         - name: role
           in: query
@@ -75,16 +103,19 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/User'
+                  $ref: '#/components/schemas/UserSummary'
               example:
                 - id: 1
                   firstName: John
                   lastName: Kamau
-                  email: john@example.com
                   role: worker
                   trade: plumbing
                   location: Westlands, Nairobi
                   verified: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
     post:
@@ -107,7 +138,9 @@ paths:
               location: South B, Nairobi
       responses:
         '201':
-          description: The user was created. The password is never returned.
+          description: >
+            The user was created. The password is stored hashed and never
+            returned. New users always start with `verified: false`.
           content:
             application/json:
               schema:
@@ -134,6 +167,10 @@ paths:
                   - password is required and must be a string
         '409':
           $ref: '#/components/responses/EmailTaken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
 
@@ -162,6 +199,10 @@ paths:
                 verified: true
         '404':
           $ref: '#/components/responses/UserNotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
     put:
@@ -170,9 +211,9 @@ paths:
       summary: Replace a user's profile
       description: >
         Send the full profile. `firstName`, `lastName`, `email` and `role` are
-        required. Omitted optional fields (`trade`, `location`) are cleared and
-        `verified` becomes false if omitted. `password` is optional here; if
-        omitted, the existing password is kept.
+        required. Omitted optional fields (`trade`, `location`) are cleared.
+        `password` is optional here; if omitted, the existing password is kept.
+        `verified` cannot be changed through the API and is ignored if sent.
       requestBody:
         required: true
         content:
@@ -186,7 +227,6 @@ paths:
               role: worker
               trade: plumbing
               location: Parklands, Nairobi
-              verified: true
       responses:
         '200':
           description: The updated user.
@@ -200,6 +240,10 @@ paths:
           $ref: '#/components/responses/UserNotFound'
         '409':
           $ref: '#/components/responses/EmailTaken'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
     delete:
@@ -212,6 +256,10 @@ paths:
           description: Deleted. The response has no body.
         '404':
           $ref: '#/components/responses/UserNotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
 
@@ -253,13 +301,22 @@ paths:
               example:
                 error: Email and password are required
         '401':
-          description: No user with that email and password.
+          description: Missing or invalid API key, or no user with that email and password.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-              example:
-                error: Invalid email or password
+              examples:
+                badKey:
+                  summary: No API key or a wrong one
+                  value:
+                    error: Missing or invalid API key
+                badCredentials:
+                  summary: Wrong email or password
+                  value:
+                    error: Invalid email or password
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
 
@@ -297,6 +354,10 @@ paths:
                   employer: Peter Mwangi
                   description: The kitchen sink has been dripping for 3 days. Need someone to replace the tap washer.
                   isActive: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
     post:
@@ -360,6 +421,10 @@ paths:
                   summary: Body is not valid JSON
                   value:
                     error: Request body is not valid JSON
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
 
@@ -394,6 +459,10 @@ paths:
                   appliedAt: "2026-09-09T04:15:00.000Z"
         '404':
           $ref: '#/components/responses/JobNotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
 
@@ -445,6 +514,10 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: Job not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
 
@@ -477,6 +550,10 @@ paths:
                 appliedAt: "2026-09-09T04:15:00.000Z"
         '404':
           $ref: '#/components/responses/BookingNotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
     put:
@@ -522,6 +599,10 @@ paths:
                   - 'status must be one of: pending, confirmed, rejected, completed'
         '404':
           $ref: '#/components/responses/BookingNotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/ServerError'
 
@@ -536,7 +617,41 @@ components:
         type: integer
       example: 1
 
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: >
+        Your API key. Each consumer gets its own, sent privately by our team.
+        Never put a real key in code, a README or a public channel.
+
   responses:
+    Unauthorized:
+      description: No `X-API-Key` header, or the key isn't valid. Nothing was done.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Missing or invalid API key
+    TooManyRequests:
+      description: >
+        This key made more than 100 requests in the current minute. Wait the
+        number of seconds in `Retry-After`, then try again.
+      headers:
+        Retry-After:
+          description: Seconds to wait before the next request.
+          schema:
+            type: integer
+            example: 42
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Too many requests
+            retryAfter: 42
     ValidationError:
       description: A required field is missing or has the wrong type. Nothing is saved.
       content:
@@ -622,6 +737,35 @@ components:
           type: boolean
           example: true
 
+    UserSummary:
+      type: object
+      description: A user as returned by search. Same as User, without email.
+      required: [id, firstName, lastName, role, verified]
+      properties:
+        id:
+          type: integer
+          example: 1
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Kamau
+        role:
+          type: string
+          enum: [worker, employer]
+        trade:
+          type: string
+          nullable: true
+          example: plumbing
+        location:
+          type: string
+          nullable: true
+          example: Westlands, Nairobi
+        verified:
+          type: boolean
+          example: true
+
     NewUser:
       type: object
       required: [firstName, lastName, email, password, role]
@@ -639,13 +783,12 @@ components:
         role:
           type: string
           enum: [worker, employer]
+          description: Must be worker or employer.
         trade:
           type: string
         location:
           type: string
-        verified:
-          type: boolean
-          default: false
+      description: Any other field (such as `id` or `verified`) is ignored.
 
     UserUpdate:
       type: object
@@ -668,8 +811,6 @@ components:
           type: string
         location:
           type: string
-        verified:
-          type: boolean
 
     Job:
       type: object
@@ -794,3 +935,6 @@ components:
           description: Only on 400 validation errors. One entry per problem.
           items:
             type: string
+        retryAfter:
+          type: integer
+          description: Only on 429. Seconds to wait before trying again.
