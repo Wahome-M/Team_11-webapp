@@ -33,3 +33,8 @@ Breaking change for consumers: **every endpoint except `GET /` now needs an `X-A
 - **`role` must be `worker` or `employer`.** Other values now get 400 instead of 500.
 - **Login now checks hashed passwords.** There's no change to the request or response shape.
 - **Version bumped to 1.2.0.**
+
+## Week 10
+
+- **Added `GET /partner/vacant-homes`** (tag Partner, `security: []`). Our web page calls it to show NyumbaHub homes that just became available. It returns `{ source, count, homes: [...] }`, or `502 {"error":"Partner data unavailable"}` when NyumbaHub can't be reached or answers unexpectedly. It's limited to 30 requests a minute per IP.
+- **Version bumped to 1.3.0.**

@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: FundiLink API
-  version: 1.2.0
+  version: 1.3.0
   description: >
     API for FundiLink, a platform connecting employers who need short-term
     casual work done with verified local workers ("fundis"). Employers post
@@ -35,6 +35,8 @@ servers:
 tags:
   - name: Health
     description: Is the server up?
+  - name: Partner
+    description: Data from our partner NyumbaHub, fetched by our server
   - name: Users
     description: Worker and employer accounts
   - name: Jobs
@@ -58,6 +60,66 @@ paths:
               schema:
                 type: string
               example: FundiLink API is running
+
+  /partner/vacant-homes:
+    get:
+      operationId: listVacantHomes
+      tags: [Partner]
+      summary: Homes on NyumbaHub that need a fundi (no key needed)
+      description: >
+        Rentals on our partner NyumbaHub that were just vacated or newly
+        listed, with area and size. Our server calls NyumbaHub (`/listings`,
+        then `/listings/{id}/location` and `/size` for up to 10 homes) using
+        the key NyumbaHub issued us; that key never reaches the caller. Open
+        without a FundiLink key because our own web page calls it; limited to
+        30 requests a minute per IP. No landlord contact details are returned.
+      security: []
+      responses:
+        '200':
+          description: >
+            Homes that became available. `area`, `city`, `bedrooms` and
+            `bathrooms` are null if that detail couldn't be fetched.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [source, count, homes]
+                properties:
+                  source:
+                    type: string
+                    example: NyumbaHub
+                  count:
+                    type: integer
+                    example: 1
+                  homes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VacantHome'
+              example:
+                source: NyumbaHub
+                count: 1
+                homes:
+                  - listingId: "1"
+                    reason: vacated
+                    suggestedJob: Move-out deep clean and repairs
+                    availableSince: "2026-09-21T22:54:06.000Z"
+                    area: Kilimani
+                    city: Nairobi
+                    bedrooms: 2
+                    bathrooms: 1
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '502':
+          description: >
+            NyumbaHub couldn't be reached, rejected our key, rate-limited us,
+            or returned data in an unexpected shape. The reason is logged on
+            our server; callers get one generic message.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Partner data unavailable
 
   /users:
     get:
@@ -922,6 +984,40 @@ components:
           description: Must be an existing user.
         workerName:
           type: string
+
+    VacantHome:
+      type: object
+      required: [listingId, reason, suggestedJob, availableSince]
+      properties:
+        listingId:
+          type: string
+          description: NyumbaHub's listing ID.
+          example: "1"
+        reason:
+          type: string
+          enum: [vacated, newly_listed]
+        suggestedJob:
+          type: string
+          example: Move-out deep clean and repairs
+        availableSince:
+          type: string
+          format: date-time
+        area:
+          type: string
+          nullable: true
+          example: Kilimani
+        city:
+          type: string
+          nullable: true
+          example: Nairobi
+        bedrooms:
+          type: integer
+          nullable: true
+          example: 2
+        bathrooms:
+          type: integer
+          nullable: true
+          example: 1
 
     Error:
       type: object

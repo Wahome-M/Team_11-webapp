@@ -12,6 +12,12 @@ app.use(express.json());
 // Public health check: returns only a fixed string, no data. Lets a tester confirm the server is up.
 app.get('/', (req, res) => res.send('FundiLink API is running'));
 
+// Week 10: our own web page reads partner (NyumbaHub) data through this route. It's open without
+// a FundiLink key because a browser page can't keep a key secret; it returns only non-sensitive
+// listing info (no contact details), and an IP rate limit stops anyone using it to burn
+// through our partner's rate limit.
+app.use('/partner', rateLimit({ windowMs: 60000, max: 30 }), require('./server/routes/partner'));
+
 // Everything below needs a valid key, then is rate limited per key
 app.use(requireApiKey);
 app.use(rateLimit({

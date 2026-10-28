@@ -1,0 +1,42 @@
+.opp-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.opp-status {
+  color: var(--mid);
+  font-size: 0.95rem;
+}
+
+.opp-status.opp-error {
+  color: var(--dark);
+  background: var(--light);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 14px 18px;
+  flex: 1;
+}
+
+.opp-refresh {
+  background: var(--primary);
+  color: var(--white);
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.opp-refresh:hover { background: #3E362F; }
+.opp-refresh:disabled { opacity: 0.6; cursor: wait; }
+
+.nav-menu a.active { color: var(--dark); font-weight: 600; }
+
+@media (max-width: 768px) {
+  .opp-toolbar { flex-direction: column; align-items: stretch; }
+}

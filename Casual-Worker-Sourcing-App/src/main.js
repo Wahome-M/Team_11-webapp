@@ -23,6 +23,7 @@ if (navMenu && user) {
     navMenu.innerHTML = `
       <li><a href="dashboard.html">Dashboard</a></li>
       <li><a href="post-job.html">Post a Job</a></li>
+      <li><a href="opportunities.html">Homes needing a fundi</a></li>
       <li><a href="#" id="logoutBtn">Log Out</a></li>
     `;
   } else {

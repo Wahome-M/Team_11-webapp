@@ -84,7 +84,7 @@ curl -H "X-API-Key: <your-api-key>" http://localhost:5000/jobs
   HTTP/1.1 401 Unauthorized
   {"error":"Missing or invalid API key"}
   ```
-- **The only open path is `GET /`**, a health check that returns the text `FundiLink API is running` and no data.
+- **Open paths:** `GET /`, a health check that returns the text `FundiLink API is running` and no data; and `GET /partner/vacant-homes`, which our own web page calls (see [Partner integration](#partner-integration-nyumbahub-week-10)).
 
 ### Rate limit
 
@@ -282,6 +282,37 @@ curl -i -X DELETE -H "X-API-Key: $API_KEY" http://localhost:5000/users/5
 
 ---
 
+## Partner integration: NyumbaHub (Week 10)
+
+Our web page **Homes needing a fundi** (`Casual-Worker-Sourcing-App/src/opportunities.html`) shows NyumbaHub rentals that were just vacated or newly listed: work for FundiLink's fundis. Our **server** calls NyumbaHub with the key they issued us, so that key never reaches the browser.
+
+**Setup:** in `server/.env`, set `PARTNER_URL` and `PARTNER_API_KEY` (placeholders are in `.env.example`), then restart.
+
+**Our route** (no FundiLink key needed, because it's what our own page calls; it's limited to 30 requests a minute per IP):
+
+```bash
+curl http://localhost:5000/partner/vacant-homes
+```
+`200 OK`
+```json
+{
+  "source": "NyumbaHub",
+  "count": 1,
+  "homes": [
+    { "listingId": "1", "reason": "vacated", "suggestedJob": "Move-out deep clean and repairs",
+      "availableSince": "2026-09-21T22:54:06.000Z", "area": "Kilimani", "city": "Nairobi", "bedrooms": 2, "bathrooms": 1 }
+  ]
+}
+```
+
+If NyumbaHub is down, rejects our key, rate-limits us, or returns an unexpected shape, the route returns `502 {"error":"Partner data unavailable"}`. The page then shows a friendly message, and the server terminal logs the reason (e.g. `ECONNREFUSED`, `ENOTFOUND`, `partner returned 401`). The rest of the API keeps working.
+
+**Open the page:** double-click `opportunities.html` with the server running. Server on another port? Add `?api=http://localhost:5001` to the page URL.
+
+**Testing without NyumbaHub:** `node partner-standin.js` (in `server/`) runs a stand-in on port 5050 that returns the examples from NyumbaHub's README. Set `PARTNER_URL=http://localhost:5050` and restart. Stopping and starting the stand-in is an easy way to rehearse the "partner down" demo.
+
+---
+
 ## Errors
 
 **Success is always a 2xx status code.** Anything else is a failure, and the body is always JSON with an `error` field:
@@ -357,10 +388,12 @@ server/
   .env.example        Settings template: copy to .env (holds API_KEYS and the rate limit)
   server/security.js  API key check and rate limiter
   server/passwords.js Password hashing
-  server/routes/      users.js, jobs.js, bookings.js
+  server/routes/      users.js, jobs.js, bookings.js, partner.js (calls NyumbaHub)
+  partner-standin.js  Fake NyumbaHub for testing and the partner-down demo
   test-all-endpoints.sh  End-to-end tests:  API_KEY=<your-api-key> bash test-all-endpoints.sh
   test-rate-limit.sh  Rate-limit demo (see SECURITY_AUDIT.md)
 SECURITY_AUDIT.md     What we checked, found and fixed in Week 9
+INTEGRATION_LOG.md    Week 10: every bug and surprise while integrating with NyumbaHub
 Casual-Worker-Sourcing-App/   Web frontend
 ```
 

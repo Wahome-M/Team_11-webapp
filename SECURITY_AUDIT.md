@@ -1,4 +1,4 @@
-﻿# Security Audit: Week 9
+# Security Audit: Week 9
 
 FundiLink API (`server/`). We read every success and error response the API can return as an attacker would, using the Part D checklist. Each item says what we checked, what we found, and what we did about it.
 
@@ -29,7 +29,7 @@ FundiLink API (`server/`). We read every success and error response the API can 
 
 - **Limit:** 100 requests per minute **per key**, set by `RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_MS` in `server/.env`. Over the limit returns `429`, a `Retry-After` header (seconds to wait) and `{"error":"Too many requests","retryAfter":N}`.
 - **Why 100 per minute:**
-  - A normal client page makes 1â€“3 calls per load, so a real user stays far below 100.
+  - A normal client page makes 1–3 calls per load, so a real user stays far below 100.
   - Our full test suite (about 50 requests) fits in one window.
   - A runaway loop is cut off within a minute instead of hammering MySQL.
   - Limits are per key, so one consumer's bug can't lock out anyone else.
@@ -38,7 +38,7 @@ FundiLink API (`server/`). We read every success and error response the API can 
 
 ```
 === Rate limit demo against http://localhost:5000 (Tue, Oct 27, 2026 10:41:33 PM) ===
-Status codes for 5 quick requests to GET /jobs: 200 200 200 429 429 
+Status codes for 5 quick requests to GET /jobs: 200 200 200 429 429
 
 --- Full 6th response (should be 429 with Retry-After and a JSON body) ---
 HTTP/1.1 429 Too Many Requests
@@ -71,7 +71,7 @@ A second key sent straight after still got `200`, which shows the limit really i
   - **Fixed:** search results use a summary without `email`. A single profile (`GET /users/{id}`) still includes it.
 - **Login error message:** the same `Invalid email or password` for a wrong email and a wrong password, so callers can't use login to find out which emails are registered. Already correct; no change needed.
 - **Passwords in responses:** user responses are built from an explicit list of fields (`mapUserToContract`), so the password hash is never returned. Already correct; no change needed.
-- **Jobs and bookings:** every field returned is in the contract and meant to be public (title, pay, location, statusâ€¦). Nothing sensitive found.
+- **Jobs and bookings:** every field returned is in the contract and meant to be public (title, pay, location, status…). Nothing sensitive found.
 
 ## 4. Other people's data
 
@@ -82,7 +82,7 @@ A second key sent straight after still got `200`, which shows the limit really i
 ## 5. Error messages
 
 - **Checked:** sent malformed JSON, unknown routes, non-numeric IDs, wrong types and duplicate emails, and stopped MySQL during a request.
-- **Found:** no stack traces, file paths, SQL or table names in any response. Every error is a short JSON message. Database errors are logged to the server terminal only, and the caller gets a generic `500 {"error":"Failed to â€¦"}`. Malformed JSON returns `400 Request body is not valid JSON`, not Express's HTML page.
+- **Found:** no stack traces, file paths, SQL or table names in any response. Every error is a short JSON message. Database errors are logged to the server terminal only, and the caller gets a generic `500 {"error":"Failed to …"}`. Malformed JSON returns `400 Request body is not valid JSON`, not Express's HTML page.
 - **Fixed:** the `X-Powered-By: Express` response header told attackers our framework, so it's now disabled with `app.disable('x-powered-by')`.
 - **Also checked:** every query uses `?` placeholders, so request values never become SQL. No SQL injection found.
 
@@ -115,4 +115,11 @@ Putting a key in the page's JavaScript would leak it to anyone who opens dev too
 - `server/test-all-endpoints.sh`, run as `API_KEY=<your-api-key> bash test-all-endpoints.sh`: **46 checks, all passing**, including 7 new authentication checks plus the email and self-verify checks. It makes about 50 requests, so wait a minute between back-to-back runs, or the rate limit will (correctly) return 429.
 - Jest suite, `Casual-Worker-Sourcing-App/src/_tests_/faraja.test.js`: **24 tests, all passing**. It has 4 new tests: no key gets 401, a wrong key gets 401, a valid key gets 200, and a write with no key saves nothing. The existing tests now send a test key, and their seed values were aligned with `schema.sql`.
 
+## Week 10 addition: `GET /partner/vacant-homes` is open
 
+Our own web page needs NyumbaHub data. A browser page can't keep a key secret, so the page calls our server, and our server adds NyumbaHub's key. That one route is therefore open without a FundiLink key. We checked what that exposes:
+
+- **What it returns:** only listing ID, availability reason, date, area, city and room counts. No landlord contact details: we never call `/landlord-contact`.
+- **Limit:** 30 requests per minute per IP, so nobody can use our server to burn through NyumbaHub's rate limit on our key.
+- **The NyumbaHub key:** it stays in `server/.env`, is never sent to the browser, and is never logged. The log prints the partner's status code and reason only.
+- **Partner data on the page:** inserted with `textContent`, never as HTML, so a bad value from the partner can't run script on our page.

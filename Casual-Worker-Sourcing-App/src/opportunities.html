@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="index.css">
+  <link rel="stylesheet" href="dashboard.css">
+  <link rel="stylesheet" href="jobs.css">
+  <link rel="stylesheet" href="opportunities.css">
+  <title>Homes needing a fundi · FundiLink</title>
+</head>
+<body>
+
+  <header>
+    <nav class="navbar">
+      <a href="index.html" class="logo">FundiLink</a>
+      <ul class="nav-menu">
+        <li><a href="dashboard.html">Dashboard</a></li>
+        <li><a href="jobs.html">Browse Jobs</a></li>
+        <li><a href="opportunities.html" class="active">Homes needing a fundi</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <div class="dash-hero">
+    <h1>Homes needing a fundi</h1>
+    <p>Rentals on NyumbaHub that were just vacated or newly listed. Each one usually needs cleaning or repairs before the next tenant moves in.</p>
+  </div>
+
+  <div class="jobs-container">
+    <div class="opp-toolbar">
+      <p id="oppStatus" class="opp-status" role="status">Loading homes from NyumbaHub…</p>
+      <button id="oppRefresh" class="opp-refresh" type="button">Refresh</button>
+    </div>
+    <div id="oppGrid" class="job-grid"></div>
+  </div>
+
+  <footer>
+    <p><strong>FundiLink</strong> · Built by Group 8 · Nairobi, Kenya · 2026 · Listings from NyumbaHub</p>
+    <div class="footer-links">
+      <a href="index.html">Home</a>
+      <a href="jobs.html">Browse Jobs</a>
+    </div>
+  </footer>
+
+  <script src="opportunities.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

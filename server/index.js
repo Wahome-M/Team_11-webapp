@@ -14,7 +14,10 @@ if (keyCount === 0) {
 }
 console.log(`Rate limit: ${Number(process.env.RATE_LIMIT_MAX) || 100} requests per ${(Number(process.env.RATE_LIMIT_WINDOW_MS) || 60000) / 1000}s per key`);
 
-const server = app.listen(PORT, () => {
+// Express 5 passes startup errors (e.g. port already in use) to this callback,
+// so only announce success when there's no error; the 'error' handler below explains failures.
+const server = app.listen(PORT, (err) => {
+  if (err) return;
   console.log(`Server running on http://localhost:${PORT}`);
 });
 
