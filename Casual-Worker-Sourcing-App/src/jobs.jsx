@@ -1,4 +1,6 @@
 const { useState, useEffect } = React;
+// Our API server (default: this laptop). Open the page with ?api=https://their-link to use another server.
+const API_BASE = new URLSearchParams(location.search).get("api") || "http://localhost:5000";
 
 function JobCard({ job, onApply }) {
   return (
@@ -32,14 +34,14 @@ function JobGrid() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://localhost:5000/jobs")
-      .then(res => res.json())
+    fetch(`${API_BASE}/web/jobs`)
+      .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
       .then(data => {
         setJobs(data.map(j => ({ ...j, applied: false })));
         setLoading(false);
       })
       .catch(() => {
-        alert("Could not load jobs. Is the server running on port 5000?");
+        alert(`Could not load jobs from ${API_BASE}. Is the server running?`);
         setLoading(false);
       });
   }, []);
@@ -59,7 +61,9 @@ function JobGrid() {
     const user = JSON.parse(localStorage.getItem("fundilinkUser"));
     if (!user) { alert("Please log in to apply."); return; }
 
-    await fetch("http://localhost:5000/bookings", {
+    // Bookings still need an API key, which a browser page can't keep secret,
+    // so applying from the website isn't connected yet (see SECURITY_AUDIT.md).
+    const res = await fetch(`${API_BASE}/bookings`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -69,6 +73,10 @@ function JobGrid() {
       })
     });
 
+    if (!res.ok) {
+      alert("Applying from the website isn't available yet. Your account and the job are fine.");
+      return;
+    }
     setJobs(prev => prev.map(j => j.id === jobId ? { ...j, applied: true } : j));
   };
 

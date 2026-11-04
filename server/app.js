@@ -18,6 +18,19 @@ app.get('/', (req, res) => res.send('FundiLink API is running'));
 // through our partner's rate limit.
 app.use('/partner', rateLimit({ windowMs: 60000, max: 30 }), require('./server/routes/partner'));
 
+// Our own website (Casual-Worker-Sourcing-App) can't keep an API key secret either, so it gets
+// three open routes of its own, sharing a strict per-IP limit (slows password guessing and spam sign-ups):
+//   POST /web/signup  same code as POST /users (new accounts always start unverified)
+//   POST /web/login   same code as POST /users/login
+//   GET  /web/jobs    same code as GET /jobs (job listings are meant to be public)
+// Everything else, including user profiles and bookings, still needs a key.
+const users = require('./server/routes/users');
+const jobs = require('./server/routes/jobs');
+const webLimit = rateLimit({ windowMs: 60000, max: 20 });
+app.post('/web/signup', webLimit, users.registerUser);
+app.post('/web/login', webLimit, users.loginUser);
+app.get('/web/jobs', webLimit, jobs.listJobs);
+
 // Everything below needs a valid key, then is rate limited per key
 app.use(requireApiKey);
 app.use(rateLimit({
@@ -25,8 +38,8 @@ app.use(rateLimit({
   max: Number(process.env.RATE_LIMIT_MAX) || 100,
 }));
 
-app.use('/users', require('./server/routes/users'));
-app.use('/jobs', require('./server/routes/jobs'));
+app.use('/users', users);
+app.use('/jobs', jobs);
 app.use('/bookings', require('./server/routes/bookings'));
 
 // Unknown routes return JSON, not Express's HTML page

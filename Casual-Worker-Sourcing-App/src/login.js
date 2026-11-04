@@ -1,3 +1,7 @@
+// Our API server. Default is this laptop; to use someone else's server (e.g. through a tunnel),
+// open the page with ?api=https://their-link
+const API_BASE = new URLSearchParams(location.search).get("api") || "http://localhost:5000";
+
 const loginForm = document.getElementById("loginForm");
 const registerForm = document.getElementById("registerForm");
 const tabLogin = document.getElementById("tabLogin");
@@ -33,12 +37,13 @@ loginForm.addEventListener("submit", async (e) => {
   if (!email || !password) { alert("Please fill in all fields."); return; }
 
   try {
-    const res = await fetch("http://localhost:5000/users/login", {
+    const res = await fetch(`${API_BASE}/web/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password })
     });
 
+    if (res.status === 429) { alert("Too many attempts. Please wait a minute and try again."); return; }
     if (!res.ok) {
       alert("Invalid email or password.");
       return;
@@ -49,13 +54,13 @@ loginForm.addEventListener("submit", async (e) => {
 
     // Redirect based on role
     if (user.role === "employer") {
-      window.location.href = "dashboard.html";
+      window.location.href = "dashboard.html" + location.search;
     } else {
-      window.location.href = "jobs.html";
+      window.location.href = "jobs.html" + location.search;
     }
 
   } catch (error) {
-    alert("Could not reach server. Is the server running on port 5000?");
+    alert(`Could not reach the server at ${API_BASE}. Is it running?`);
   }
 });
 
@@ -77,7 +82,7 @@ registerForm.addEventListener("submit", async (e) => {
   }
 
   try {
-    const res = await fetch("http://localhost:5000/users", {
+    const res = await fetch(`${API_BASE}/web/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ firstName, lastName, email, password, role })
@@ -87,6 +92,7 @@ registerForm.addEventListener("submit", async (e) => {
       alert("That email is already registered. Try logging in instead.");
       return;
     }
+    if (res.status === 429) { alert("Too many attempts. Please wait a minute and try again."); return; }
     if (!res.ok) {
       alert("Registration failed. Please try again.");
       return;
@@ -96,12 +102,12 @@ registerForm.addEventListener("submit", async (e) => {
     localStorage.setItem("fundilinkUser", JSON.stringify(newUser));
 
     if (newUser.role === "employer") {
-      window.location.href = "dashboard.html";
+      window.location.href = "dashboard.html" + location.search;
     } else {
-      window.location.href = "jobs.html";
+      window.location.href = "jobs.html" + location.search;
     }
 
   } catch (error) {
-    alert("Could not reach server. Is the server running on port 5000?");
+    alert(`Could not reach the server at ${API_BASE}. Is it running?`);
   }
 });

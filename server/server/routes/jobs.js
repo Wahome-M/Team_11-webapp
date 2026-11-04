@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../db');
 
 // GET /jobs (browse all, with optional category filter)
-router.get('/', async (req, res) => {
+async function listJobs(req, res) {
   try {
     const { category } = req.query;
     let query = 'SELECT * FROM jobs WHERE isActive = TRUE';
@@ -22,7 +22,8 @@ router.get('/', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Failed to fetch jobs' });
   }
-});
+}
+router.get('/', listJobs);
 
 // POST /jobs (create a job posting)
 router.post('/', async (req, res) => {
@@ -67,3 +68,5 @@ router.get('/:id/bookings', async (req, res) => {
 });
 
 module.exports = router;
+// Also used by the website's open route GET /web/jobs (see app.js)
+module.exports.listJobs = listJobs;

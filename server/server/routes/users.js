@@ -88,7 +88,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /users (registration)
-router.post('/', async (req, res) => {
+async function registerUser(req, res) {
   try {
     const errors = validateUserData(req.body);
     if (errors.length > 0) {
@@ -113,7 +113,8 @@ router.post('/', async (req, res) => {
     }
     return res.status(500).json({ error: 'Failed to create user' });
   }
-});
+}
+router.post('/', registerUser);
 
 // PUT /users/:id (update existing user)
 router.put('/:id', async (req, res) => {
@@ -169,7 +170,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // POST /users/login (checks credentials; no token yet)
-router.post('/login', async (req, res) => {
+async function loginUser(req, res) {
   try {
     const { email, password } = req.body;
     if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
@@ -187,6 +188,10 @@ router.post('/login', async (req, res) => {
     console.error(err);
     return res.status(500).json({ error: 'Login failed' });
   }
-});
+}
+router.post('/login', loginUser);
 
 module.exports = router;
+// Also used by the website's open routes POST /web/signup and /web/login (see app.js)
+module.exports.registerUser = registerUser;
+module.exports.loginUser = loginUser;
