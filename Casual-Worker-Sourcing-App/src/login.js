@@ -1,6 +1,6 @@
-// Our API server. Default is this laptop; to use someone else's server (e.g. through a tunnel),
-// open the page with ?api=https://their-link
-const API_BASE = new URLSearchParams(location.search).get("api") || "http://localhost:5000";
+// Our API server: this laptop when opened as a file, the Render API when deployed,
+// or any server given as ?api=https://their-link (see config.js)
+const API_BASE = window.FUNDILINK_API; // set in config.js
 
 const loginForm = document.getElementById("loginForm");
 const registerForm = document.getElementById("registerForm");
@@ -27,6 +27,23 @@ tabRegister.addEventListener("click", (e) => { e.preventDefault(); showRegister(
 document.getElementById("switchToRegister").addEventListener("click", (e) => { e.preventDefault(); showRegister(); });
 document.getElementById("switchToLogin").addEventListener("click", (e) => { e.preventDefault(); showLogin(); });
 
+// Trade and area only matter for workers
+const regRole = document.getElementById("regRole");
+regRole.addEventListener("change", () => {
+  document.getElementById("regWorkerFields").classList.toggle("hidden", regRole.value !== "worker");
+});
+
+// Reads the server's {"error": "..."} message, plus any validation details, for the alert
+async function serverError(res) {
+  try {
+    const data = await res.json();
+    const details = Array.isArray(data.details) ? ` (${data.details.join("; ")})` : "";
+    return `${data.error || "Unknown error"}${details} [HTTP ${res.status}]`;
+  } catch {
+    return `HTTP ${res.status}`;
+  }
+}
+
 // ── Login ─────────────────────────────────────────────────────────────────────
 loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -45,7 +62,8 @@ loginForm.addEventListener("submit", async (e) => {
 
     if (res.status === 429) { alert("Too many attempts. Please wait a minute and try again."); return; }
     if (!res.ok) {
-      alert("Invalid email or password.");
+      // Show the server's real reason (wrong password, old server, database down...) instead of guessing
+      alert(`Login failed: ${await serverError(res)}`);
       return;
     }
 
@@ -73,6 +91,9 @@ registerForm.addEventListener("submit", async (e) => {
   const email     = document.getElementById("regEmail").value.trim();
   const password  = document.getElementById("regPassword").value.trim();
   const role      = document.getElementById("regRole").value;
+  // Workers say what they do and where, so employers (and Faraja's search) can find them
+  const trade     = document.getElementById("regTrade").value;
+  const location_ = document.getElementById("regLocation").value.trim();
 
   if (!firstName || !lastName || !email || !password || !role) {
     alert("Please fill in all fields."); return;
@@ -80,12 +101,17 @@ registerForm.addEventListener("submit", async (e) => {
   if (password.length < 8) {
     alert("Password must be at least 8 characters."); return;
   }
+  if (role === "worker" && (!trade || !location_)) {
+    alert("Please choose your trade and enter your area, so employers can find you."); return;
+  }
 
   try {
     const res = await fetch(`${API_BASE}/web/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ firstName, lastName, email, password, role })
+      body: JSON.stringify(role === "worker"
+        ? { firstName, lastName, email, password, role, trade, location: location_ }
+        : { firstName, lastName, email, password, role })
     });
 
     if (res.status === 409) {
@@ -94,7 +120,7 @@ registerForm.addEventListener("submit", async (e) => {
     }
     if (res.status === 429) { alert("Too many attempts. Please wait a minute and try again."); return; }
     if (!res.ok) {
-      alert("Registration failed. Please try again.");
+      alert(`Registration failed: ${await serverError(res)}`);
       return;
     }
 

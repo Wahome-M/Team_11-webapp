@@ -1,6 +1,6 @@
 const { useState, useEffect } = React;
 // Our API server (default: this laptop). Open the page with ?api=https://their-link to use another server.
-const API_BASE = new URLSearchParams(location.search).get("api") || "http://localhost:5000";
+const API_BASE = window.FUNDILINK_API; // set in config.js
 
 function JobCard({ job, onApply }) {
   return (
@@ -34,16 +34,21 @@ function JobGrid() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API_BASE}/web/jobs`)
-      .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
-      .then(data => {
-        setJobs(data.map(j => ({ ...j, applied: false })));
-        setLoading(false);
-      })
-      .catch(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE}/web/jobs`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        // Mark the jobs this worker has already applied for
+        const mine = await window.fundilinkApi("/web/my-bookings");
+        const appliedIds = new Set(mine.ok ? mine.body.map(b => b.jobId) : []);
+        setJobs(data.map(j => ({ ...j, applied: appliedIds.has(j.id) })));
+      } catch {
         alert(`Could not load jobs from ${API_BASE}. Is the server running?`);
+      } finally {
         setLoading(false);
-      });
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -57,27 +62,15 @@ function JobGrid() {
     return () => chips.forEach(chip => chip.removeEventListener("click", handleClick));
   }, []);
 
+  // Apply as the logged-in worker. The server takes who you are from your login, not from the page.
   const handleApply = async (jobId) => {
-    const user = JSON.parse(localStorage.getItem("fundilinkUser"));
-    if (!user) { alert("Please log in to apply."); return; }
-
-    // Bookings still need an API key, which a browser page can't keep secret,
-    // so applying from the website isn't connected yet (see SECURITY_AUDIT.md).
-    const res = await fetch(`${API_BASE}/bookings`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jobId,
-        workerId: user.id,
-        workerName: `${user.firstName} ${user.lastName}`
-      })
-    });
-
-    if (!res.ok) {
-      alert("Applying from the website isn't available yet. Your account and the job are fine.");
+    const r = await window.fundilinkApi("/web/bookings", { method: "POST", body: { jobId } });
+    if (r.ok || r.status === 409) {
+      setJobs(prev => prev.map(j => j.id === jobId ? { ...j, applied: true } : j));
+      if (r.ok) alert("Application sent! Track it under My Applications.");
       return;
     }
-    setJobs(prev => prev.map(j => j.id === jobId ? { ...j, applied: true } : j));
+    if (r.status !== 401) alert(`Could not apply: ${window.fundilinkError(r)}`);
   };
 
   if (loading) return <p className="no-results">Loading jobs...</p>;

@@ -1,0 +1,12 @@
+{
+  "name": "fundilink",
+  "private": true,
+  "description": "FundiLink: repo-level test runner. The API itself lives in server/ (see README).",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  }
+}

@@ -1,5 +1,5 @@
 const request = require('supertest');
-const app = require('../../../Server/app');
+const app = require('../../../server/app');
 
 // Week 9: every endpoint needs an API key. The tests register their own key, so they
 // don't depend on (or reveal) the real keys in server/.env.
@@ -62,7 +62,7 @@ const validJob = () => ({
   employerId: 1,
 });
 
-afterAll(() => require('../../../Server/server/db').end());
+afterAll(() => require('../../../server/server/db').end());
 
 describe('GET /users (filtered verified workers)', () => {
   it('happy path: returns verified workers matching trade and location', async () => {
@@ -254,7 +254,7 @@ describe('GET /users/:id', () => {
 
 afterAll(async () => {
   try {
-    await require('../../../Server/server/db').end();
+    await require('../../../server/server/db').end();
   } catch (e) {
     // pool already closed, nothing to do
   }

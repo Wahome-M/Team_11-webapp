@@ -13,7 +13,7 @@ FundiLink API (`server/`). We read every success and error response the API can 
 | 5 | Write endpoints | Callers could send `"verified": true` and mark themselves verified | **Fixed**: `verified` is ignored on create and update |
 | 6 | Error messages | `X-Powered-By: Express` header advertised our framework | **Fixed**: header removed |
 | 7 | Other people's data | Any key holder can read any user's profile by ID | **Accepted for now** (see below) |
-| 8 | Our own frontend | The web frontend calls the API from the browser with no key, so it now gets 401 | **Open**: to fix in Week 10 |
+| 8 | Our own frontend | The web frontend calls the API from the browser with no key, so it now gets 401 | **Fixed** (Nov): website uses `/web` routes with signed session tokens (see end of file) |
 
 ## 1. Authentication (Part B)
 
@@ -123,3 +123,18 @@ Our own web page needs NyumbaHub data. A browser page can't keep a key secret, s
 - **Limit:** 30 requests per minute per IP, so nobody can use our server to burn through NyumbaHub's rate limit on our key.
 - **The NyumbaHub key:** it stays in `server/.env`, is never sent to the browser, and is never logged. The log prints the partner's status code and reason only.
 - **Partner data on the page:** inserted with `textContent`, never as HTML, so a bad value from the partner can't run script on our page.
+
+## November update: the website, monitoring and v2
+
+**The website (item 8, now fixed).** The site can't hold an API key, so it uses its own `/web` routes (`server/server/routes/web.js`):
+- **Public:** signup, login and the job list. They're public on any website. Signup and login are limited to 20 a minute per IP. Each login costs the server about 48 ms of `scrypt` (see `MONITORING_NOTES.md`), so guessing passwords is slow.
+- **Everything else** needs the session token returned at login, sent as `Authorization: Bearer <token>`. The token is `{id, role, expiry}` signed with HMAC-SHA256 using `WEB_SESSION_SECRET`, and checked with a constant-time comparison. It's valid for 8 hours.
+- **The server takes who you are from the token, never from the page.** `POST /web/bookings` ignores any `workerId` sent, and `POST /web/jobs` ignores any `employerId`. Workers can't post jobs (403). An employer can only confirm or reject applications on their **own** jobs (403 otherwise). Applying twice gets 409. All of these are tested in `server/tests/web.test.js`.
+- **Pages insert data with `textContent`, never as HTML**, so a job title or a name can't run script in someone else's browser.
+- **Still accepted:** the token lives in the browser's `localStorage`, so a script injected into our pages could read it. We have no HTML injection points, but an `HttpOnly` cookie would be safer.
+
+**Monitoring.** The request log writes a 6-character hash of the key (`key-8153ac`), never the key, and paths without query strings. `grep -c <key> requests.log` printed 0. `*.log` is git-ignored. `/stats` needs a key.
+
+**v2** is mounted after the key check (`/v2/jobs` with no key gets 401, which is tested).
+
+**Website files.** The server serves `Casual-Worker-Sourcing-App/src` at `/app/`, except the tests folder and the old `db.json` mock data (which has plain-text sample passwords): both return 404.

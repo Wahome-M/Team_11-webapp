@@ -27,21 +27,23 @@
   </div>
 
   <div class="dash-container">
-    <div class="dash-empty">
-      <h3>No jobs posted yet</h3>
-      <p>Post your first job to start receiving applications from verified workers.</p>
-      <a href="#" class="btn-primary">Post a Job</a>
+    <div class="dash-toolbar">
+      <h2>Your job postings</h2>
+      <a href="post-job.html" class="btn-primary">Post a Job</a>
     </div>
+    <p id="dashMsg" class="dash-msg" role="status">Loading your jobs…</p>
+    <div id="dashJobs" class="dash-list"></div>
   </div>
 
   <footer>
-    <p><strong>FundiLink</strong> · Built by Group 8 · Nairobi, Kenya · 2026</p>
+    <p><strong>FundiLink</strong> · Built by Team 11 · Nairobi, Kenya · 2026</p>
     <div class="footer-links">
       <a href="index.html">Home</a>
       <a href="jobs.html">Browse Jobs</a>
     </div>
   </footer>
 
+  <script src="config.js"></script>
   <script src="dashboard.js"></script>
   <script src="main.js"></script>
 </body>

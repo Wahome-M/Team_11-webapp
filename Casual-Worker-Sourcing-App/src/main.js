@@ -30,6 +30,7 @@ if (navMenu && user) {
     navMenu.innerHTML = `
       <li><a href="jobs.html">Browse Jobs</a></li>
       <li><a href="my-applications.html">My Applications</a></li>
+      <li><a href="opportunities.html">Homes needing a fundi</a></li>
       <li><a href="#" id="logoutBtn">Log Out</a></li>
     `;
   }

@@ -19,7 +19,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /bookings (apply to a job)
-router.post('/', async (req, res) => {
+async function createBooking(req, res) {
   try {
     const { jobId, workerId, workerName } = req.body;
     const details = [];
@@ -43,10 +43,11 @@ router.post('/', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Failed to create booking' });
   }
-});
+}
+router.post('/', createBooking);
 
 // PUT /bookings/:id (update booking status)
-router.put('/:id', async (req, res) => {
+async function updateBooking(req, res) {
   try {
     const { status } = req.body;
     if (!STATUSES.includes(status)) {
@@ -66,6 +67,10 @@ router.put('/:id', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Failed to update booking' });
   }
-});
+}
+router.put('/:id', updateBooking);
 
 module.exports = router;
+// Also used by the website's /web routes (see routes/web.js)
+module.exports.createBooking = createBooking;
+module.exports.updateBooking = updateBooking;

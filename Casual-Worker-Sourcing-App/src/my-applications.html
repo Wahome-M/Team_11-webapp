@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="index.css">
+  <link rel="stylesheet" href="dashboard.css">
+  <title>My Applications · FundiLink</title>
+</head>
+<body>
+
+  <header>
+    <nav class="navbar">
+      <a href="index.html" class="logo">FundiLink</a>
+      <ul class="nav-menu">
+        <li><a href="dashboard.html">Dashboard</a></li>
+        <li><a href="jobs.html">Browse Jobs</a></li>
+        <li><a href="opportunities.html">Homes needing a fundi</a></li>
+        <li><a href="#" id="logoutBtn" class="btn-nav">Log Out</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <div class="dash-hero">
+    <h1>My applications</h1>
+    <p>Every job you've applied for, and whether the employer has confirmed you.</p>
+  </div>
+
+  <div class="dash-container">
+    <div class="dash-toolbar">
+      <p id="appsMsg" class="dash-msg" role="status">Loading your applications…</p>
+      <a href="jobs.html" class="btn-primary">Browse more jobs</a>
+    </div>
+    <div id="appsList" class="dash-list"></div>
+  </div>
+
+  <footer>
+    <p><strong>FundiLink</strong> · Built by Team 11 · Nairobi, Kenya · 2026</p>
+    <div class="footer-links">
+      <a href="index.html">Home</a>
+      <a href="jobs.html">Browse Jobs</a>
+    </div>
+  </footer>
+
+  <script src="config.js"></script>
+  <script src="my-applications.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

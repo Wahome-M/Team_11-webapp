@@ -40,3 +40,6 @@
 @media (max-width: 768px) {
   .opp-toolbar { flex-direction: column; align-items: stretch; }
 }
+
+/* Week 11: saved-data banner when NyumbaHub isn't answering */
+.opp-status.opp-stale { border-style: solid; border-color: var(--beige); background: #FBF3EA; }

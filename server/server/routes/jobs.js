@@ -26,7 +26,7 @@ async function listJobs(req, res) {
 router.get('/', listJobs);
 
 // POST /jobs (create a job posting)
-router.post('/', async (req, res) => {
+async function createJob(req, res) {
   try {
     const { title, category, location, pay, payType, urgent, duration, employerId, employer, description } = req.body;
     if (!title || !category || !location || typeof pay !== 'number' || pay < 0) {
@@ -51,7 +51,8 @@ router.post('/', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Failed to create job' });
   }
-});
+}
+router.post('/', createJob);
 
 // GET /jobs/:id/bookings (all applications for one job)
 router.get('/:id/bookings', async (req, res) => {
@@ -70,3 +71,4 @@ router.get('/:id/bookings', async (req, res) => {
 module.exports = router;
 // Also used by the website's open route GET /web/jobs (see app.js)
 module.exports.listJobs = listJobs;
+module.exports.createJob = createJob;

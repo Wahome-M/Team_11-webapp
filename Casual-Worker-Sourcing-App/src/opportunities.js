@@ -1,7 +1,7 @@
 // "Homes needing a fundi": shows NyumbaHub listings that just became available.
 // This page only talks to OUR server (no partner key here). Our server calls NyumbaHub.
 // Server on another port (e.g. 5001 on a Mac)? Open the page with ?api=http://localhost:5001
-const API_BASE = new URLSearchParams(location.search).get('api') || 'http://localhost:5000';
+const API_BASE = window.FUNDILINK_API; // set in config.js
 
 const statusEl = document.getElementById('oppStatus');
 const grid = document.getElementById('oppGrid');
@@ -71,6 +71,12 @@ async function loadHomes() {
     if (!res.ok) { showUnavailable(); return; }
     const data = await res.json();
     render(Array.isArray(data.homes) ? data.homes : []);
+    // Week 11: NyumbaHub failed, so our server sent the last good copy. Say so: old data shown as live would be a lie.
+    if (data.stale) {
+      const when = new Date(data.asOf);
+      statusEl.textContent = `Showing saved NyumbaHub data from ${isNaN(when) ? 'earlier' : when.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}. NyumbaHub is not responding right now, so this may be out of date.`;
+      statusEl.classList.add('opp-error', 'opp-stale');
+    }
   } catch {
     // Our own server is unreachable (not running, wrong port)
     showUnavailable();

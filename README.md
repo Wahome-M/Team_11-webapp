@@ -51,11 +51,13 @@ node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
 Save the file. `server/.env` is git-ignored: never commit it, and never paste a real key into this README or a chat channel.
 
 ```bash
-# 7. Start the API
-npm start
+# 7. Start the API (from the repo root: ./run.sh on Mac/Linux/Git Bash, run.cmd on Windows;
+#    or, from server/, npm start)
+cd ..
+./run.sh
 ```
 
-You should see `API keys loaded: 1` and `Server running on http://localhost:5000`. Leave this terminal open, open a **second terminal**, and run (paste your key in place of `<your-api-key>`):
+You should see `API keys loaded: 1` and `Server running on http://localhost:5000`. The **website** is served by the same server: open **<http://localhost:5000/app/>** (log in as `john@example.com` or `peter@example.com`, password `password123`). Leave this terminal open, open a **second terminal**, and run (paste your key in place of `<your-api-key>`):
 
 ```bash
 export API_KEY=<your-api-key>
@@ -312,6 +314,68 @@ If NyumbaHub is down, rejects our key, rate-limits us, or returns an unexpected 
 **Testing without NyumbaHub:** `node partner-standin.js` (in `server/`) runs a stand-in on port 5050 that returns the examples from NyumbaHub's README. Set `PARTNER_URL=http://localhost:5050` and restart. Stopping and starting the stand-in is an easy way to rehearse the "partner down" demo.
 
 ---
+
+## Website, monitoring, versions and resilience (Weeks 11–13)
+
+### The website: `http://localhost:5000/app/`
+
+The server also serves our web app (`Casual-Worker-Sourcing-App/src`) at `/app/`. Open it there, not as a file: Chrome won't load the Browse Jobs page's React code from a `file://` address. On a tunnel or on Render, it's the same link plus `/app/`.
+
+| Who | Can do |
+|---|---|
+| Anyone | Register (workers give a trade and area), log in, browse jobs, see "Homes needing a fundi" (NyumbaHub data) |
+| Worker | Apply for a job (once per job), see **My Applications** and their status |
+| Employer | **Post a Job**, see applicants on the **Dashboard**, confirm, reject or mark a job done |
+
+A browser page can't keep an API key secret, so the website uses its own `/web/...` routes instead. Signup, login and the job list are public (20 a minute per IP on signup and login). Everything else needs the **session token** returned at login (`Authorization: Bearer <token>`, signed with HMAC-SHA256 and valid for 8 hours). The server takes who you are from the token, so a page can't apply or confirm on someone else's behalf. Set `WEB_SESSION_SECRET` in `.env` so logins survive a restart.
+
+### `GET /stats`: request numbers (needs a key)
+
+```bash
+curl -H "X-API-Key: $API_KEY" http://localhost:5000/stats
+```
+
+```json
+{ "startedAt": "2026-11-10T08:23:24.000Z", "uptimeSeconds": 95, "total": 147,
+  "clientErrors": 39, "serverErrors": 0, "errorRatePercent": 0, "avgMs": 3.9, "partnerFallbacks": 0,
+  "routes": { "GET /users": { "count": 27, "clientErrors": 0, "serverErrors": 0, "avgMs": 2, "maxMs": 4.6 } } }
+```
+
+Every request is also logged as one JSON line (time, method, path without query string, status, ms, and the caller as `key-xxxxxx`, a hash, never the key). Add `LOG_FILE=requests.log` to `server/.env` to also write the lines to a file. `server/traffic.js` sends a realistic mix of requests for testing. See [`MONITORING_NOTES.md`](MONITORING_NOTES.md).
+
+### v2 beside v1
+
+`/v2/...` has the same endpoints, but wraps responses: lists come back as `{ "data": [...], "count": N }` and single items as `{ "data": {...} }`. Errors are unchanged. v1 (`/v1/...` and the old unversioned URLs) still works unchanged until **20 Nov 2026**, and every v1 response carries `Deprecation`, `Sunset` and `Link` headers. See [`DEPRECATION_NOTICE.md`](DEPRECATION_NOTICE.md) and [`VERSIONING_NOTES.md`](VERSIONING_NOTES.md).
+
+### When NyumbaHub is slow or down
+
+Each call to NyumbaHub gives up after `PARTNER_TIMEOUT_MS` (default 2000 ms) and is retried at most twice (only for timeouts, connection errors, 429 and 5xx). If it still fails, `/partner/vacant-homes` returns the last good data with `"stale": true` and the time it was saved, and the page shows a banner. To rehearse it: `node server/partner-standin.js`, set `PARTNER_URL=http://localhost:5050`, then `curl http://localhost:5050/__mode/slow` (also `flaky`, `error`, `ok`). See [`RESILIENCE_NOTES.md`](RESILIENCE_NOTES.md).
+
+### Tests
+
+From the repo root, with MySQL running and `server/.env` set up:
+
+```bash
+npm install        # once: installs Jest and supertest
+npx jest           # 53 tests: endpoints, auth, v1/v2, /stats, website sessions, retries
+node server/setup-db.js --yes   # afterwards: reset the sample data (the tests add rows)
+```
+
+## Deployment: reachable from any network
+
+The live version runs without anyone's laptop:
+
+| Part | Where | Address |
+|---|---|---|
+| Database | TiDB Cloud Starter (MySQL-compatible, free) | private; only our API connects |
+| API (`server/`) and website | One Render web service (free) | API: `https://fundilink-api.onrender.com`, website: `https://fundilink-api.onrender.com/app/` |
+
+- **Render settings:** Root Directory empty (the whole repo), Build Command `npm install --prefix server`, Start Command `node server/index.js`.
+- **The website finds the API through `src/config.js`.** Served at `/app/`, it uses the same address. `?api=<link>` in the address overrides that.
+- **Settings:** on Render they're set on the API service's **Environment** page, not in a file: the same names as `server/.env.example`, plus `DB_SSL=true` (TiDB only accepts encrypted connections), `TRUST_PROXY=true` (so per-IP limits see each visitor's real IP behind Render's proxy) and `WEB_SESSION_SECRET` (a long random string, so website logins survive restarts).
+- **Loading the tables into TiDB:** with the TiDB settings in your terminal's environment, run `node setup-db.js` in `server/` to check which database it targets, then `node setup-db.js --yes`. This deletes and reloads the sample data, the same as running `schema.sql` locally.
+- **Free-tier sleep:** the Render API sleeps after 15 minutes without traffic, and the first request then takes about a minute. Open `https://fundilink-api.onrender.com/` a minute before demoing.
+- **IDs:** TiDB hands out IDs in blocks, so a new job may get an ID like `30001` instead of `3`.
 
 ## Errors
 

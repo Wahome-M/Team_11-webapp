@@ -54,7 +54,15 @@ One row per bug or surprise. "Whose code" is about where the cause was, not blam
 | When | What they reported | Our side or theirs? | What we did |
 |---|---|---|---|
 | Earlier (Week 10 dry run) | `curl -i` in PowerShell failed with "Cannot find drive 'https'" | Theirs (PowerShell's `curl` alias) | Told them to use `curl.exe`; first call then returned 200 |
+| 10 Nov | (Week 13) Our deprecation notice for Faraja is written: v2 wraps responses in `{ data, count }`, and v1 works until 20 Nov | Ours (planned change) | Notice in `DEPRECATION_NOTICE.md`. TODO: send it to Faraja with the full text and record when; their reply; their calls showing on our `/v2` rows in `/stats` |
 | TODO | | | |
+
+## Week 11 and 13 additions
+
+| # | What happened | Cause | What we did | Whose code |
+|---|---|---|---|---|
+| 9 | (Week 11 drill) With the stand-in in `slow` mode, our page waited the full 10 s | No timeout on the partner call | 2 s timeout, at most 2 retries, saved-data fallback with a banner (`RESILIENCE_NOTES.md`) | Ours, fixed by us |
+| 10 | (Week 13) No deprecation notice or v2 from NyumbaHub by 10 Nov | n/a | Our code is ready: their response shape lives only in `server/server/partnerVersions.js`. TODO: ask Team 10 | Theirs (pending) |
 
 ## Demo checklist
 

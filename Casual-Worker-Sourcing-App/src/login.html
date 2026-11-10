@@ -65,6 +65,27 @@
             <option value="employer">Employer</option>
           </select>
         </div>
+        <div id="regWorkerFields" class="hidden">
+          <div class="form-group">
+            <label for="regTrade">Trade</label>
+            <select id="regTrade">
+              <option value="" selected disabled>What do you do?</option>
+              <option value="plumbing">Plumbing</option>
+              <option value="electrical">Electrical</option>
+              <option value="cleaning">Cleaning</option>
+              <option value="carpentry">Carpentry</option>
+              <option value="painting">Painting</option>
+              <option value="masonry">Masonry</option>
+              <option value="cooking">Cooking</option>
+              <option value="security">Security</option>
+              <option value="driving">Driving</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="regLocation">Area</label>
+            <input type="text" id="regLocation" placeholder="e.g. Kilimani, Nairobi">
+          </div>
+        </div>
         <button type="submit" class="btn-submit">Create Account</button>
         <p class="switch-text">Already have an account? <a id="switchToLogin">Log in</a></p>
       </form>
@@ -72,6 +93,7 @@
     </div>
   </div>
 
+  <script src="config.js"></script>
   <script src="./login.js"></script>
   <script src="./main.js"></script>
 </body>

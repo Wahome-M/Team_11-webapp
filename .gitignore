@@ -3,3 +3,6 @@
 **/.env
 
 node_modules/
+
+# Week 12: request logs can hold caller labels and paths; keep them out of git
+*.log
