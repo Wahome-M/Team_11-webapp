@@ -2,6 +2,7 @@
 
 FundiLink connects people in Nairobi who need short-term work done (plumbing, cleaning, painting and so on) with local casual workers ("fundis"). This API is the backend: **employers** post jobs, **workers** apply to them (an application is called a **booking**), and employers confirm or reject each booking. It's for anyone building a FundiLink client, such as our web frontend or a mobile app.
 
+- **Swagger UI** (try every endpoint in the browser): with the server running, open **<http://localhost:5000/docs>** (or your tunnel link + `/docs`). Click **Authorize**, paste your API key, then **Try it out** on any endpoint.
 - Full endpoint reference (every field, every response): open **[`docs/index.html`](docs/index.html)** in your browser. No setup needed; just double-click the file after cloning.
 - Contract source: [`openapi.yaml`](openapi.yaml)
 
@@ -445,6 +446,7 @@ HTTP/1.1 404 Not Found
 ```
 openapi.yaml          API contract (source for docs/index.html)
 docs/index.html       Rendered API reference (Redoc). Opens offline.
+docs/swagger.html     Swagger UI, served by the API at /docs (reads /openapi.yaml)
 server/
   index.js            Starts the server
   app.js              Routes and middleware (API key check and rate limit run before every route)

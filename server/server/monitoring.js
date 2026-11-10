@@ -38,8 +38,8 @@ function writeLine(line) {
 }
 
 function monitor(req, res, next) {
-  // Website files (/app/...) aren't API calls: leave them out so the log shows API traffic only
-  if (req.path === '/app' || req.path.startsWith('/app/')) return next();
+  // Website files (/app/...) and the docs page aren't API calls: leave them out so the log shows API traffic only
+  if (req.path === '/app' || req.path.startsWith('/app/') || req.path === '/docs' || req.path === '/openapi.yaml') return next();
   const start = process.hrtime.bigint();
   res.on('finish', () => { // runs after the response has been sent, so status and timing are final
     const ms = Number(process.hrtime.bigint() - start) / 1e6;

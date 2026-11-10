@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: FundiLink API
-  version: 1.3.0
+  version: 1.4.0
   description: >
     API for FundiLink, a platform connecting employers who need short-term
     casual work done with verified local workers ("fundis"). Employers post
@@ -25,10 +25,25 @@ info:
     problem. Check the HTTP status code first: 2xx is success, anything else
     is a failure.
 
+
+    **Versions:** the paths below are **v1**. They also answer at `/v1/...`,
+    and every v1 response carries `Deprecation: true`, `Sunset: Fri, 20 Nov
+    2026` and a `Link` header pointing to v2. **v2** (`/v2/users`, `/v2/jobs`,
+    `/v2/bookings`, …) has the same endpoints, but wraps successful responses:
+    lists become `{ "data": [...], "count": N }` and single items become
+    `{ "data": {...} }`. Errors are the same in both. See `DEPRECATION_NOTICE.md`.
+
+
+    **Monitoring:** `GET /stats` returns request totals, the error rate and
+    per-route timings. Every request is logged as one JSON line, with no keys
+    and no query strings.
+
 security:
   - ApiKeyAuth: []   # every operation needs a key unless it overrides this
 
 servers:
+  - url: /
+    description: This server (when you open the docs at /docs, here or through a tunnel)
   - url: http://localhost:5000
     description: Local development server (see README.md to run it)
 
@@ -43,6 +58,10 @@ tags:
     description: Job postings created by employers
   - name: Bookings
     description: A worker's application to a job, and its status
+  - name: Monitoring
+    description: Request numbers (Week 12)
+  - name: v2
+    description: The same API with the { data, count } envelope (Week 13)
 
 paths:
   /:
@@ -83,11 +102,22 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [source, count, homes]
+                required: [source, count, homes, stale, asOf]
                 properties:
                   source:
                     type: string
                     example: NyumbaHub
+                  stale:
+                    type: boolean
+                    description: >
+                      true when NyumbaHub didn't answer (after a 2 s timeout and
+                      at most 2 retries) and this is the last good copy, saved at `asOf`.
+                    example: false
+                  asOf:
+                    type: string
+                    format: date-time
+                    description: When this data was fetched from NyumbaHub.
+                    example: "2026-11-10T08:26:12.000Z"
                   count:
                     type: integer
                     example: 1
@@ -107,19 +137,113 @@ paths:
                     city: Nairobi
                     bedrooms: 2
                     bathrooms: 1
+                stale: false
+                asOf: "2026-11-10T08:26:12.000Z"
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '502':
           description: >
             NyumbaHub couldn't be reached, rejected our key, rate-limited us,
-            or returned data in an unexpected shape. The reason is logged on
-            our server; callers get one generic message.
+            or returned data in an unexpected shape, and no saved copy exists
+            yet (e.g. just after a restart). The reason is logged on our
+            server; callers get one generic message.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
               example:
                 error: Partner data unavailable
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [Monitoring]
+      summary: Request totals, error rate and per-route timings
+      description: >
+        Running totals since the server started (kept in memory, so a restart
+        resets them). Routes are grouped by pattern (`GET /users/:id`), and v1
+        and v2 appear as separate rows, so we can see who still uses v1.
+      responses:
+        '200':
+          description: The numbers.
+          content:
+            application/json:
+              example:
+                startedAt: "2026-11-10T08:49:13.315Z"
+                uptimeSeconds: 78
+                total: 147
+                clientErrors: 39
+                serverErrors: 0
+                errorRatePercent: 0
+                avgMs: 3.9
+                partnerFallbacks: 0
+                routes:
+                  GET /users:
+                    count: 27
+                    clientErrors: 0
+                    serverErrors: 0
+                    avgMs: 2
+                    maxMs: 4.6
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/jobs:
+    get:
+      operationId: listJobsV2
+      tags: [v2]
+      summary: Browse jobs (v2 shape)
+      description: >
+        Same as `GET /jobs`, wrapped in `{ data, count }`. Every other v2 path
+        (`/v2/users`, `/v2/users/{id}`, `/v2/jobs/{id}/bookings`, `/v2/bookings`,
+        `/v2/bookings/{id}`) works the same way: same parameters and request
+        bodies as v1, with single items wrapped as `{ data }`.
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+          example: plumbing
+      responses:
+        '200':
+          description: Active jobs, wrapped.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, count]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Job'
+                  count:
+                    type: integer
+                    example: 2
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v2/users/{id}:
+    get:
+      operationId: getUserV2
+      tags: [v2]
+      summary: One user (v2 shape)
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: The user, wrapped in `{ data }`.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '404':
+          $ref: '#/components/responses/UserNotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /users:
     get:

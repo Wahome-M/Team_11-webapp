@@ -39,6 +39,11 @@ app.use(express.json());
 // Public health check: returns only a fixed string, no data. Lets a tester confirm the server is up.
 app.get('/', (req, res) => res.send('FundiLink API is running'));
 
+// API documentation: Swagger UI at /docs, reading our contract from /openapi.yaml. Public, like any
+// API's docs; "Try it out" still needs a key (click Authorize). Redoc version: docs/index.html.
+app.get('/openapi.yaml', (req, res) => res.type('text/yaml').sendFile(path.join(__dirname, '..', 'openapi.yaml')));
+app.get('/docs', (req, res) => res.sendFile(path.join(__dirname, '..', 'docs', 'swagger.html')));
+
 // Week 10/11: our own web page reads partner (NyumbaHub) data through this route. It's open without
 // a FundiLink key because a browser page can't keep a key secret; it returns only non-sensitive
 // listing info (no contact details), and an IP rate limit stops anyone using it to burn
